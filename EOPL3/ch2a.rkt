@@ -16,12 +16,28 @@
   (provide (all-defined-out))
 )
 
-(require 'v1)
-(define plus
-  (lambda (x y)
-    (if (is-zero? x)
-      y
-      (successor (plus (predecessor x) y)))))
+(module v3 racket
+  (define zero (lambda () '(0)))
+  (provide (all-defined-out))
+)
 
-(successor (zero))
-(plus (successor (zero)) (successor (zero)))
+(require 'v1)
+(define (plus x y)
+  (if (is-zero? x)
+    y
+    (successor (plus (predecessor x) y))))
+
+(define (mul a b)
+  (if (is-zero? b)
+    (zero)
+     (plus a (mul a (predecessor b)))))
+
+
+(define one (successor (zero)))
+one
+(define two (plus (successor (zero)) (successor (zero))))
+two
+(define four (mul two two))
+four
+(define eight (mul two four))
+eight
