@@ -1,5 +1,29 @@
 #lang racket
 
+(define (foldl f acc xs)
+  (if (null? xs)
+      acc
+      (foldl f
+             (f acc (car xs))
+             (cdr xs))))
+
+(define (foldr1 f acc xs)
+  (if (null? xs)
+      acc
+      (f (foldr f acc (cdr xs))
+         (car xs))))
+(define (foldr2 f acc xs)
+  (if (null? xs)
+      acc
+      (f (car xs)
+         (foldr f acc (cdr xs)))))
+
+(foldl list 'init '(a b c))
+(foldr1 list 'init '(a b c))
+(foldr2 list 'init '(a b c))
+
+
+
 (module v1 racket
   (define zero (lambda () '()))
   (define is-zero? (lambda (n) (null? n)))
@@ -24,17 +48,21 @@
 (module v3 racket
   (define NN 16)
   (define zero (lambda () '()))
-  (define (iz-zero? n) (lambda (n) (null? n)))
+  (define (is-zero? n) (lambda (n) (null? n)))
   (define (inc n)
     (if (< (add1 n) NN)
-          (cons 0 (add1 n))
-          (cons 1 0)))
+          (cons #f (add1 n))
+          (cons #t 0)))
   (define (dec n)
     (if (< (sub1 n) 0)
-          (cons -1 0)
-          (cons 0 (sub1 n))))
+          (cons #t 0)
+          (cons #f (sub1 n))))
+  (define (succ-rec n)
+    'void)
   (define (successor n)
-    'not-implemeted)
+    (if (is-zero? n)
+      '(1)
+      (succ-rec n)))
   (provide (all-defined-out))
 )
 
