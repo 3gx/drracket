@@ -77,7 +77,7 @@
   (provide (all-defined-out))
 )
 
-(require 'v1)
+(require 'v2)
 (define (plus x y)
   (if (is-zero? x)
     y
@@ -87,6 +87,11 @@
   (if (is-zero? b)
     (zero)
      (plus a (mul a (predecessor b)))))
+
+(define (factorial n)
+  (if (is-zero? (predecessor n))
+    n
+    (mul n (factorial (predecessor n)))))
 
 
 (define one (successor (zero)))
@@ -98,3 +103,6 @@ four
 (define eight (mul two four))
 eight
 (println (format "value: ~a" (value eight)))
+(define fac (factorial eight))
+fac
+(println (format "value: ~a" (value fac)))
