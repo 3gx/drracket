@@ -46,9 +46,9 @@
 )
 
 (module v3 racket
-  (define NN 16)
+  (define NN 999)
   (define zero (lambda () '()))
-  (define (is-zero? n) (lambda (n) (null? n)))
+  (define (is-zero? n) (null? n))
 
   (define (rfold f acc lst)
     (if (null? lst)
@@ -61,23 +61,52 @@
     (define m (cdr carry-m))
     (define n1
       (if carry
-        (add1 n1)
-        n1))
+        (add1 n)
+        n))
     (if (< n1 NN)
       (cons #f (cons n1 m))
       (cons #t (cons 0 m))))
 
+  (define (dec n carry-m)
+    (define carry (car carry-m))
+    (define m (cdr carry-m))
+    (define n1
+      (if carry
+        (sub1 n)
+        n))
+    (if (< n1 0)
+      (cons #t (cons (sub1 NN) m))
+      (cons #f (cons n1 m))))
+
   (define (successor n)
-    (define carry-m (rfold inc '(#t '()) n))
+    (define carry-m (rfold inc (cons #t '()) n))
     (define carry (car carry-m))
     (define m (cdr carry-m))
     (if carry
       (cons 1 m)
       m))
+
+  (define (predecessor n)
+    (define carry-m (rfold dec (cons #t '()) n))
+    (define carry (car carry-m))
+    (define m (cdr carry-m))
+    (if (eq? 0 (car m))
+      (cdr m)
+      m))
+
+  (define (pow n pair)
+    (define val (car pair))
+    (define ex (cdr pair))
+    (cons (+ val (* n (expt NN ex))) (add1 ex)))
+
+  (define (value n)
+    (car (rfold pow (cons 0 0) n)))
+
+
   (provide (all-defined-out))
 )
 
-(require 'v2)
+(require 'v3)
 (define (plus x y)
   (if (is-zero? x)
     y
@@ -96,6 +125,13 @@
 
 (define one (successor (zero)))
 one
+(successor one)
+(define three (successor (successor one)))
+three
+(println (format "value: ~a" (value three)))
+(successor one)
+(predecessor (successor one))
+(predecessor (predecessor (successor one)))
 (define two (plus (successor (zero)) (successor (zero))))
 two
 (define four (mul two two))
@@ -103,6 +139,15 @@ four
 (define eight (mul two four))
 eight
 (println (format "value: ~a" (value eight)))
-(define fac (factorial eight))
-fac
-(println (format "value: ~a" (value fac)))
+(define twelve (plus eight  four))
+twelve
+(println (format "value: ~a" (value twelve)))
+(define fac8 (factorial eight))
+fac8
+(println (format "value: ~a" (value fac8)))
+(define fac9 (factorial (successor eight)))
+fac9
+(println (format "value: ~a" (value fac9)))
+(define fac10 (factorial (successor (successor eight))))
+fac10
+(println (format "value: ~a" (value fac10)))
