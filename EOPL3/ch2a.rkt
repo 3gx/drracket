@@ -49,20 +49,31 @@
   (define NN 16)
   (define zero (lambda () '()))
   (define (is-zero? n) (lambda (n) (null? n)))
-  (define (inc n)
-    (if (< (add1 n) NN)
-          (cons #f (add1 n))
-          (cons #t 0)))
-  (define (dec n)
-    (if (< (sub1 n) 0)
-          (cons #t 0)
-          (cons #f (sub1 n))))
-  (define (succ-rec n)
-    'void)
+
+  (define (rfold f acc lst)
+    (if (null? lst)
+      acc
+      (f (car lst)
+         (rfold f acc (cdr lst)))))
+
+  (define (inc n carry-m)
+    (define carry (car carry-m))
+    (define m (cdr carry-m))
+    (define n1
+      (if carry
+        (add1 n1)
+        n1))
+    (if (< n1 NN)
+      (cons #f (cons n1 m))
+      (cons #t (cons 0 m))))
+
   (define (successor n)
-    (if (is-zero? n)
-      '(1)
-      (succ-rec n)))
+    (define carry-m (rfold inc '(#t '()) n))
+    (define carry (car carry-m))
+    (define m (cdr carry-m))
+    (if carry
+      (cons 1 m)
+      m))
   (provide (all-defined-out))
 )
 
