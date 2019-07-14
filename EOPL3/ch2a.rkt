@@ -46,7 +46,7 @@
 )
 
 (module v3 racket
-  (define NN 999)
+  (define NN 256)
   (define zero (lambda () '()))
   (define (is-zero? n) (null? n))
 
