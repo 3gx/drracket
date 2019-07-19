@@ -34,3 +34,4 @@
 (occurs-free? 'y l1)
 (occurs-free? 'x (app-exp (lambda-exp 'x (var-exp 'x))
                           (app-exp (var-exp 'x) (var-exp 'y))))
+l1
