@@ -32,6 +32,22 @@
 (define l1 (lambda-exp 'x (app-exp (var-exp 'x) (var-exp 'y))))
 (occurs-free? 'x l1)
 (occurs-free? 'y l1)
-(occurs-free? 'x (app-exp (lambda-exp 'x (var-exp 'x))
-                          (app-exp (var-exp 'x) (var-exp 'y))))
+(define l2 (app-exp (lambda-exp 'x (var-exp 'x))
+                     (app-exp (var-exp 'x) (var-exp 'y))))
+(occurs-free? 'x l2)
+
+(define unparse-lc-exp
+  (lambda (exp)
+    (cases lc-exp exp
+      (var-exp (var) var)
+      (lambda-exp (bound-var body)
+                  (list 'lambda (list bound-var)
+                        (unparse-lc-exp body)))
+      (app-exp (rator rand)
+               (list
+                (unparse-lc-exp rator) (unparse-lc-exp rand))))))
+
 l1
+(unparse-lc-exp l1)
+l2
+(unparse-lc-exp l2)
