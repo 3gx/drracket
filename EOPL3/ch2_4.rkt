@@ -36,6 +36,20 @@
                      (app-exp (var-exp 'x) (var-exp 'y))))
 (occurs-free? 'x l2)
 
+(define parse-expression
+  (lambda (datum)
+    (cond
+      ((symbol? datum) (var-exp datum))
+      ((pair? datum)
+       (if (eqv? (car datum) 'lambda)
+           (lambda-exp
+            (car (cadr datum))
+            (parse-expression (caddr datum)))
+           (app-exp
+            (parse-expression (car datum))
+            (parse-expression (cadr datum)))))
+      (else (error "Invalid syntax" datum)))))
+
 (define unparse-lc-exp
   (lambda (exp)
     (cases lc-exp exp
@@ -51,3 +65,10 @@ l1
 (unparse-lc-exp l1)
 l2
 (unparse-lc-exp l2)
+
+(parse-expression '((lambda (a) (a b)) c))
+(parse-expression '(lambda (x)
+                     (lambda (y)
+                       ((lambda (x)
+                          (x y))
+                        x))))
