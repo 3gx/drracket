@@ -101,11 +101,12 @@
       (error "Bad environment: " env)]))
 
 (define (environment? x)
-  (or (null? x)
+  (println x)
+  (or (eqv? 'empty-env (car x))
       (and (pair? x)
-           (symbol? (car (car x)))
-           (expval? (cadr (car x)))
-           (environment? (cdr x)))))
+           (symbol? (cadr x))
+           (expval? (caddr x))
+           (environment? (cadddr x)))))
 
 
 (define (init-env)
@@ -195,7 +196,7 @@
 
 
 (define pgm1 (scan&parse "
-  let x = 200
+  let x = 250
   in let f = proc (z) -(z,x)
      in let x = 100
         in let g = proc (z) -(z,x)
