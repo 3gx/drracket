@@ -149,11 +149,26 @@
         'x (num-val 10)
         (empty-env)))))
 
+
+(define (nameless-environment? x)
+  ((list-of expval? x)))
+
+(define (extend-nameless-env val env)
+  (cons val env))
+
+(define (apply-nameless-env env n)
+  (list-ref env n))
+
 (define-datatype proc proc?
   (procedure
-    (var symbol?)
     (body expression?)
-    (env environment?)))
+    (saved-nameless-env nameless-environment?)))
+
+(define (apply-procedure proc1 val)
+  (cases proc proc1
+    (procedure (body saved-nameless-env)
+      (value-of (body saved-nameless-env)
+        (extend-nameless-env val saved-nameless-env)))))
 
 
 
@@ -249,4 +264,5 @@ pgm1
 
 pgm2
 (translation-of-program pgm2)
+
 
