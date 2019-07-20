@@ -175,13 +175,14 @@
 (define (translation-of-program pgm)
   (cases program pgm
     (a-program (exp1)
-      (a-program translation-of exp1 (init-senv)))))
+      (a-program (translation-of exp1 (init-senv))))))
 
 (define (init-senv)
   (extend-senv 'i
     (extend-senv 'v
       (extend-senv 'x
         (empty-senv)))))
+
 
 (define (translation-of exp senv)
   (cases expression exp
@@ -212,7 +213,8 @@
     [let-exp (var exp1 body)
              (nameless-let-exp
                (translation-of exp1 senv)
-               (extend-senv var senv))]
+               (translation-of body
+                    (extend-senv var senv)))]
     [proc-exp (var body)
               (nameless-proc-exp
                 (translation-of body
@@ -225,3 +227,25 @@
       (error "Invalid source expression" exp)]))
 
 
+(define ast3
+  (scan&parse "
+    letrec fact(n) =
+       if zero?(n) then 1 else *(n, (fact -(n,1)))
+    in (fact 5)
+  "))
+ast3
+
+(define pgm1 (scan&parse "
+         -(55, -(x,11))"))
+pgm1
+(translation-of-program pgm1)
+
+(define pgm2
+(scan&parse "
+  let f = proc(x) -(x,11)
+  in (f (f 77))
+  ")
+  )
+
+pgm2
+(translation-of-program pgm2)
