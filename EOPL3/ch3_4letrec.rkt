@@ -80,34 +80,29 @@
            in -((f 1), (g 1))
            ")
 
-(define (empty-env)
-  (list 'empty-env))
-
-(define (extend-env var val env)
-  (list 'extend-env var val env))
-
-(define (apply-env env var)
-  (cond
-    [(eqv? (car env) 'empty-env)
-     (error "No binding for" var)]
-    [(eqv? (car env) 'extend-env)
-     (let ([saved-var (cadr env)]
-           [saved-val (caddr env)]
-           [saved-env (cadddr env)])
-       (if (eqv? var saved-var)
-         saved-val
-         (apply-env saved-env var)))]
-    [else
-      (error "Bad environment: " env)]))
-
-(define (environment? x)
-  (println x)
-  (or (eqv? 'empty-env (car x))
-      (and (pair? x)
-           (symbol? (cadr x))
-           (expval? (caddr x))
-           (environment? (cadddr x)))))
-
+(define-datatype environment environment?
+  (empty-env)
+  (extend-env
+    (var symbol?)
+    (val expval?)
+    (env environment?))
+  (extend-env-rec
+    (p-name symbol?)
+    (b-var symbol?)
+    (body expression?)
+    (env environment?)))
+(define (apply-env env search-var)
+  (cases environment env
+    (empty-env ()
+      (error "No binding for" search-var))
+    (extend-env (saved-var saved-val saved-env)
+      (if (eqv? saved-var search-var)
+        saved-val
+        (apply-env saved-env search-var)))
+    (extend-env-rec (p-name b-var p-body saved-env)
+      (if (eqv? p-name search-var)
+        (proc-val (procedure b-var p-body env))
+        (apply-env saved-env search-var)))))
 
 (define (init-env)
   (extend-env
