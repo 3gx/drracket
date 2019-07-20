@@ -22,6 +22,9 @@
     (expression
      ("-" "(" expression "," expression ")")
      diff-exp)
+    (expression
+     ("*" "(" expression "," expression ")")
+     mul-exp)
 
     (expression
      ("zero?" "(" expression ")")
@@ -44,6 +47,12 @@
     (expression
       ("(" expression expression ")")
       call-exp)
+
+    (expression
+      ("letrec"
+       identifier "(" identifier ")" "=" expression
+       "in" expression)
+      letrec-exp)
 
     ))
 
@@ -121,6 +130,7 @@
 
 
 
+
 (define-datatype expval expval?
   (num-val
     (value number?))
@@ -167,6 +177,12 @@
              [num1 (expval->num val1)]
              [num2 (expval->num val2)])
         (num-val (- num1 num2))))
+    (mul-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (* num1 num2))))
     (zero?-exp (exp1)
       (let* ([val1 (value-of exp1 env)]
              [num1 (expval->num val1)])
@@ -186,16 +202,38 @@
     (call-exp (rator rand)
       (let ([proc (expval->proc (value-of rator env))]
             [arg (value-of rand env)])
-        (apply-procedure proc arg)))))
+        (apply-procedure proc arg)))
+    (letrec-exp (p-name b-var p-body letrec-body)
+      (value-of letrec-body (extend-env-rec p-name b-var p-body env)))))
 
 
 
-(define pgm1 (scan&parse "
-  let x = 250
-  in let f = proc (z) -(z,x)
-     in let x = 100
-        in let g = proc (z) -(z,x)
-           in -((f 1), (g 1))
-           "))
-pgm1
-(run pgm1)
+(define ast1
+  (scan&parse "
+    letrec double(x)
+       = if zero?(x) then 0 else -((double -(x,1)), -2)
+    in (double 6)
+    "))
+ast1
+(run ast1)
+
+(define ast2
+  (scan&parse "
+      letrec even(x) =
+          if zero?(x) then 1 else (odd -(x,1))
+      in letrec odd(x) =
+            if zero?(x) then 0 else (even -(x,1))
+         in (odd 13)
+  "))
+ast2
+;(run ast2)
+
+(define ast3
+  (scan&parse "
+    letrec fact(n) =
+       if zero?(n) then 1 else *(n, (fact -(n,1)))
+    in (fact 5)
+  "))
+ast3
+(run ast3)
+
