@@ -37,6 +37,14 @@
      ("let" identifier "=" expression "in" expression)
      let-exp)
 
+    (expression
+      ("proc" "(" identifier ")" expression)
+      proc-exp)
+
+    (expression
+      ("(" expression expression ")")
+      call-exp)
+
     ))
 
 ;;;;;;;;;;;;;;;; sllgen boilerplate ;;;;;;;;;;;;;;;;
@@ -56,6 +64,21 @@
 
 (scan&parse "-(55, -(x,11))")
 (scan&parse "if 42 then 43 else 45")
+(scan&parse "
+  let f = proc(x) -(x,11)
+  in (f (f 77))
+  ")
+(scan&parse "
+  let f = proc(x) -(x,11)
+  in (f (f 77))
+  ")
+(scan&parse "
+  let x = 200
+  in let f = proc (z) -(z,x)
+     in let x = 100
+        in let g = proc (z) -(z,x)
+           in -((f 1), (g 1))
+           ")
 
 (define (empty-env)
   (list 'empty-env))
@@ -104,6 +127,7 @@
     (bool-val (bool) bool)
     (else (error "failed to extract bool" val))))
 
+#|
 (define (run ast)
   (value-of-program ast))
 
@@ -139,24 +163,4 @@
 
 
 
-(init-env)
-(define ast1 (scan&parse "
-                         let x = 42
-                         in let y = -(x,13)
-                            in -(x,y)"))
-ast1
-(run ast1)
-
-(define ast2 (scan&parse "
-                        let x = 42
-                        in let y = -(x,13)
-                           in if zero?(-(-(x,y),13)) then x else y"))
-ast2
-(run ast2)
-
-(define ast3 (scan&parse "
-                        let x = 42
-                        in let y = -(x,13)
-                          in if zero?(-(-(x,y),15)) then x else y"))
-ast3
-(run ast3)
+|#
