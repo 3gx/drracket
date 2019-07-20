@@ -100,6 +100,13 @@
     [else
       (error "Bad environment: " env)]))
 
+(define (environment? x)
+  (or (null? x)
+      (and (pair? x)
+           (symbol? (car (car x)))
+           (expval? (cadr (car x)))
+           (environment? (cdr x)))))
+
 
 (define (init-env)
   (extend-env
@@ -110,12 +117,21 @@
         'x (num-val 10)
         (empty-env)))))
 
+(define-datatype proc proc?
+  (procedure
+    (var symbol?)
+    (body expression?)
+    (env environment?)))
+
+
 
 (define-datatype expval expval?
   (num-val
     (value number?))
   (bool-val
-    (boolean boolean?)))
+    (boolean boolean?))
+  (proc-val
+    (proc proc?)))
 
 (define (expval->num val)
   (cases expval val
@@ -127,7 +143,16 @@
     (bool-val (bool) bool)
     (else (error "failed to extract bool" val))))
 
-#|
+(define (apply-procedure proc1 val)
+  (cases proc proc1
+    (procedure (var body env)
+      (value-of body (extend-env var val env)))))
+
+(define (expval->proc val)
+  (cases expval val
+    (proc-val (proc) proc)
+    (else (error "failed to extract proc" val))))
+
 (define (run ast)
   (value-of-program ast))
 
@@ -159,8 +184,13 @@
           (value-of exp3 env))))
     (let-exp (var exp1 body)
       (let ([val1 (value-of exp1 env)])
-        (value-of body (extend-env var val1 env))))))
+        (value-of body (extend-env var val1 env))))
+    (proc-exp (var body)
+      (proc-val (procedure var body env)))
+    (call-exp (rator rand)
+      (let ([proc (expval->proc (value-of rator env))]
+            [arg (value-of rand env)])
+        (apply-procedure proc arg)))))
 
 
 
-|#
