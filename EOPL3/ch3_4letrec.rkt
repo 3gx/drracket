@@ -23,6 +23,9 @@
      ("-" "(" expression "," expression ")")
      diff-exp)
     (expression
+     ("+" "(" expression "," expression ")")
+     plus-exp)
+    (expression
      ("*" "(" expression "," expression ")")
      mul-exp)
 
@@ -177,6 +180,12 @@
              [num1 (expval->num val1)]
              [num2 (expval->num val2)])
         (num-val (- num1 num2))))
+    (plus-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (+ num1 num2))))
     (mul-exp (exp1 exp2)
       (let* ([val1 (value-of exp1 env)]
              [val2 (value-of exp2 env)]
@@ -243,7 +252,7 @@ ast3
       letrec d(x) = proc(z) ((f (x x)) z)
       in proc(n) ((f (d d)) n)
     in letrec t4m(f) =
-          proc(x) if zero?(x) then 0 else -((f -(x,1)),-4)
+          proc(x) if zero?(x) then 0 else +((f -(x,1)),4)
        in let times4 = (fix t4m)
           in (times4 3)"
      ))
