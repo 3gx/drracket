@@ -237,3 +237,16 @@ ast2
 ast3
 (run ast3)
 
+(define ast4
+  (scan&parse "
+    letrec fix(f) =
+      letrec d(x) = proc(z) ((f (x x)) z)
+      in proc(n) ((f (d d)) n)
+    in letrec t4m(f) =
+          proc(x) if zero?(x) then 0 else -((f -(x,1)),-4)
+       in let times4 = (fix t4m)
+          in (times4 3)"
+     ))
+ast4
+(run ast4)
+
