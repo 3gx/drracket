@@ -80,6 +80,82 @@
 (define just-scan
   (sllgen:make-string-scanner the-lexical-spec the-grammar))
 
+(define-datatype expval expval?
+  (num-val
+    (value number?))
+  (bool-val
+    (boolean boolean?))
+  (proc-val
+    (proc proc?)))
+
+(define (expval->num val)
+  (cases expval val
+    (num-val (num) num)
+    (else (error "failed to extract num" val))))
+
+(define (expval->bool val)
+  (cases expval val
+    (bool-val (bool) bool)
+    (else (error "failed to extract bool" val))))
+
+;(define (apply-procedure proc1 val)
+;  (cases proc proc1
+;    (procedure (var body env)
+;      (value-of body (extend-env var val env)))))
+
+(define (expval->proc val)
+  (cases expval val
+    (proc-val (proc) proc)
+    (else (error "failed to extract proc" val))))
+
+;(define (run ast)
+;  (value-of-program ast))
+
+;(define (value-of-program pgm)
+;  (cases program pgm
+;    (a-program (exp1)
+;      (value-of exp1 (init-env)))))
+
+(define-datatype environment environment?
+  (empty-env)
+  (extend-env
+    (var symbol?)
+    (val expval?)
+    (env environment?))
+  (extend-env-rec
+    (p-name symbol?)
+    (b-var symbol?)
+    (body expression?)
+    (env environment?)))
+(define (apply-env env search-var)
+  (cases environment env
+    (empty-env ()
+      (error "No binding for" search-var))
+    (extend-env (saved-var saved-val saved-env)
+      (if (eqv? saved-var search-var)
+        saved-val
+        (apply-env saved-env search-var)))
+    (extend-env-rec (p-name b-var p-body saved-env)
+      (if (eqv? p-name search-var)
+        (proc-val (procedure b-var p-body env))
+        (apply-env saved-env search-var)))))
+
+(define (init-env)
+  (extend-env
+    'i (num-val 1)
+    (extend-env
+      'v (num-val 5)
+      (extend-env
+        'x (num-val 10)
+        (empty-env)))))
+
+(define-datatype proc proc?
+  (procedure
+    (var symbol?)
+    (body expression?)
+    (env environment?)))
+
+
 
 (define (empty-senv) '())
 (define (extend-senv var senv)
@@ -95,3 +171,17 @@
 (apply-senv '(z y x) 'x)
 (apply-senv '(z y x) 'y)
 (apply-senv '(z y x) 'z)
+
+(define (translation-of-program pgm)
+  (cases program pgm
+    (a-program (exp1)
+      (a-program translation-of exp1 (init-senv)))))
+
+(define (init-senv)
+  (extend-senv 'i
+    (extend-senv 'v
+      (extend-senv 'x
+        (empty-senv)))))
+
+(define (translation-of exp senv)
+  'void)
