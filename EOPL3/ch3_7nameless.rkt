@@ -111,10 +111,21 @@
 ;(define (run ast)
 ;  (value-of-program ast))
 
-;(define (value-of-program pgm)
-;  (cases program pgm
-;    (a-program (exp1)
-;      (value-of exp1 (init-env)))))
+(define (value-of-program pgm)
+  (cases program pgm
+    (a-program (exp1)
+      (value-of exp1 (init-nameless-env)))))
+
+(define (empty-nameless-env) '())
+
+(define (init-nameless-env)
+  (extend-nameless-env
+    (num-val 1)
+    (extend-nameless-env
+      (num-val 5)
+      (extend-nameless-env
+        (num-val 10)
+        (empty-nameless-env)))))
 
 (define-datatype environment environment?
   (empty-env)
@@ -151,7 +162,7 @@
 
 
 (define (nameless-environment? x)
-  ((list-of expval? x)))
+  ((list-of expval?) x))
 
 (define (extend-nameless-env val env)
   (cons val env))
@@ -166,9 +177,9 @@
 
 (define (apply-procedure proc1 val)
   (cases proc proc1
-    (procedure (body saved-nameless-env)
-      (value-of (body saved-nameless-env)
-        (extend-nameless-env val saved-nameless-env)))))
+    [procedure (body saved-nameless-env)
+      (value-of body
+                (extend-nameless-env val saved-nameless-env))]))
 
 
 
@@ -241,6 +252,53 @@
     [else
       (error "Invalid source expression" exp)]))
 
+(define (value-of exp env)
+  (cases expression exp
+    [const-exp (num) (num-val num)]
+    [diff-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (- num1 num2)))]
+    [plus-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (+ num1 num2)))]
+    [mul-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (* num1 num2)))]
+    [zero?-exp (exp1)
+      (let* ([val1 (value-of exp1 env)]
+             [num1 (expval->num val1)])
+        (if (zero? num1)
+          (bool-val #t)
+          (bool-val #f)))]
+    [if-exp (exp1 exp2 exp3)
+      (let ([val1 (value-of exp1 env)])
+        (if (expval->bool val1)
+          (value-of exp2 env)
+          (value-of exp3 env)))]
+    [call-exp (rator rand)
+      (let ([proc (expval->proc (value-of rator env))]
+            [arg (value-of rand env)])
+        (apply-procedure proc arg))]
+    [nameless-var-exp (n)
+      (apply-nameless-env env n)]
+    [nameless-let-exp (exp1 body)
+      (let ([val (value-of exp1 env)])
+        (value-of body (extend-nameless-env val env)))]
+    [nameless-proc-exp (body)
+      (proc-val (procedure body env))]
+    [else
+      (error "Invalid expression" exp)]))
+
+
 
 (define ast3
   (scan&parse "
@@ -263,6 +321,8 @@ pgm1
   )
 
 pgm2
-(translation-of-program pgm2)
+(define npgm2 (translation-of-program pgm2))
+npgm2
+(value-of-program npgm2)
 
 
