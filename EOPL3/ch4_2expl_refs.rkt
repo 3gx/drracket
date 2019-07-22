@@ -122,13 +122,20 @@ prog1
 "))
 prog2
 
-#|
+(define (init-env)
+  (extend-env
+    'i (num-val 1)
+    (extend-env
+      'v (num-val 5)
+      (extend-env
+        'x (num-val 10)
+        (empty-env)))))
+
 (define (value-of-program pgm)
   (initialize-store!)
   [cases program pgm
          (a-program (exp1)
                     (value-of exp1 (init-env)))])
-|#
 
 (define (empty-store) '())
 
@@ -315,5 +322,7 @@ r2
 the-store
 (deref r2)
 |#
+
+(value-of-program prog2)
 
 
