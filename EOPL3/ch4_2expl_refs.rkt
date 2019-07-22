@@ -122,11 +122,13 @@ prog1
 "))
 prog2
 
+#|
 (define (value-of-program pgm)
   (initialize-store!)
   [cases program pgm
          (a-program (exp1)
                     (value-of exp1 (init-env)))])
+|#
 
 (define (empty-store) '())
 
@@ -143,10 +145,175 @@ prog2
 
 (define (newref val)
   (let ([next-ref (length the-store)])
-    (set! the-store (append the-store (list val)))))
+    (set! the-store (append the-store (list val)))
+    next-ref))
 
 (define (deref ref)
   (list-ref the-store ref))
 
+(define (setref! ref val)
+  (set! the-store
+    (letrec
+      ([setref-inner
+         (lambda (store1 ref1)
+           (cond
+             [(null? store1)
+              (error "Invalid ref" ref the-store)]
+             [(zero? ref1)
+              (cons val (cdr store1))]
+             [else
+               (cons
+                 (car store1)
+                 (setref-inner
+                   (cdr store1) (sub1 ref1)))]))])
+      (setref-inner the-store ref))))
+
+(define-datatype environment environment?
+  (empty-env)
+  (extend-env
+    (var symbol?)
+    (val expval?)
+    (env environment?))
+  (extend-env-rec
+    (p-name symbol?)
+    (b-var symbol?)
+    (body expression?)
+    (env environment?)))
+
+(define (apply-env env search-var)
+  (cases environment env
+    (empty-env ()
+      (error "No binding for" search-var))
+    (extend-env (saved-var saved-val saved-env)
+      (if (eqv? saved-var search-var)
+        saved-val
+        (apply-env saved-env search-var)))
+    (extend-env-rec (p-name b-var p-body saved-env)
+      (if (eqv? p-name search-var)
+        (proc-val (procedure b-var p-body env))
+        (apply-env saved-env search-var)))))
+
+(define-datatype proc proc?
+  (procedure
+    (var symbol?)
+    (body expression?)
+    (env environment?)))
+
+(define (apply-procedure proc1 val)
+  (cases proc proc1
+    (procedure (var body env)
+      (value-of body (extend-env var val env)))))
+
+(define-datatype expval expval?
+  (num-val
+    (value number?))
+  (bool-val
+    (boolean boolean?))
+  (proc-val
+    (proc proc?))
+  (ref-val
+    (ref reference?)))
+
+(define (expval->num val)
+  (cases expval val
+    (num-val (num) num)
+    (else (error "failed to extract num" val))))
+
+(define (expval->bool val)
+  (cases expval val
+    (bool-val (bool) bool)
+    (else (error "failed to extract bool" val))))
+
+(define (expval->ref val)
+  (cases expval val
+    (ref-val (ref) ref)
+    (else (error "failed to extract ref" val))))
+
+(define (expval->proc val)
+  (cases expval val
+    (proc-val (proc) proc)
+    (else (error "failed to extract proc" val))))
+
+(define (value-of exp env)
+  (cases expression exp
+    (const-exp (num) (num-val num))
+    (var-exp (var) (apply-env env var))
+    (diff-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (- num1 num2))))
+    (plus-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (+ num1 num2))))
+    (mul-exp (exp1 exp2)
+      (let* ([val1 (value-of exp1 env)]
+             [val2 (value-of exp2 env)]
+             [num1 (expval->num val1)]
+             [num2 (expval->num val2)])
+        (num-val (* num1 num2))))
+    (zero?-exp (exp1)
+      (let* ([val1 (value-of exp1 env)]
+             [num1 (expval->num val1)])
+        (if (zero? num1)
+          (bool-val #t)
+          (bool-val #f))))
+    (if-exp (exp1 exp2 exp3)
+      (let ([val1 (value-of exp1 env)])
+        (if (expval->bool val1)
+          (value-of exp2 env)
+          (value-of exp3 env))))
+    (let-exp (var exp1 body)
+      (let ([val1 (value-of exp1 env)])
+        (value-of body (extend-env var val1 env))))
+    (proc-exp (var body)
+      (proc-val (procedure var body env)))
+    (call-exp (rator rand)
+      (let ([proc (expval->proc (value-of rator env))]
+            [arg (value-of rand env)])
+        (apply-procedure proc arg)))
+    (letrec-exp (p-name b-var p-body letrec-body)
+      (value-of letrec-body (extend-env-rec p-name b-var p-body env)))
+    [begin-exp (exp1 exps)
+               (letrec
+                 ([value-of-begins
+                    (lambda (e1 es)
+                      (let ([v1 (value-of e1 env)])
+                        (if (null? es)
+                          v1
+                          (value-of-begins (car es) (cdr es)))))])
+                 (value-of-begins exp1 exps))]
+    [newref-exp (exp1)
+                (let ([v1 (value-of exp1 env)])
+                  (ref-val (newref v1)))]
+    [deref-exp (exp1)
+               (let* ([v1 (value-of exp1 env)]
+                      [ref1 (expval->ref v1)])
+                 (deref ref1))]
+    [setref-exp (exp1 exp2)
+                (let* ([ref (expval->ref (value-of exp1 env))]
+                       [val2 (value-of  exp2 env)])
+                  (begin
+                    (setref! ref val2)
+                    (num-val 23)))]))
+
+
+
+#|
+(initialize-store!)
+(define r1 (newref 42))
+(define r2 (newref 43))
+(define r3 (newref 44))
+the-store
+r2
+(deref r2)
+(setref! r2 55)
+the-store
+(deref r2)
+|#
 
 
