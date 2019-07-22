@@ -181,10 +181,10 @@ prog2
     (var symbol?)
     (val expval?)
     (env environment?))
-  (extend-env-rec
-    (p-name symbol?)
-    (b-var symbol?)
-    (body expression?)
+  (extend-env-rec*
+    (p-names (list-of symbol?))
+    (b-vars (list-of symbol?))
+    (bodies (list-of expression?))
     (env environment?)))
 
 (define (apply-env env search-var)
@@ -195,10 +195,27 @@ prog2
       (if (eqv? saved-var search-var)
         saved-val
         (apply-env saved-env search-var)))
-    (extend-env-rec (p-name b-var p-body saved-env)
-      (if (eqv? p-name search-var)
-        (proc-val (procedure b-var p-body env))
-        (apply-env saved-env search-var)))))
+    (extend-env-rec* (p-names b-vars p-bodies saved-env)
+      (cond
+        [(location search-var p-names)
+         => (lambda (n)
+              (proc-val
+                (procedure
+                  (list-ref b-vars n)
+                  (list-ref p-bodies n)
+                  env)))]
+        [else
+          (apply-env saved-env search-var)]))))
+
+(define location
+  (lambda (sym syms)
+    (cond
+      ((null? syms) #f)
+      ((eqv? sym (car syms)) 0)
+      ((location sym (cdr syms))
+       => (lambda (n)
+            (+ n 1)))
+      (else #f))))
 
 (define-datatype proc proc?
   (procedure
@@ -283,8 +300,8 @@ prog2
       (let ([proc (expval->proc (value-of rator env))]
             [arg (value-of rand env)])
         (apply-procedure proc arg)))
-    (letrec-exp (p-name b-var p-body letrec-body)
-      (value-of letrec-body (extend-env-rec p-name b-var p-body env)))
+    (letrec-exp (p-names b-vars p-bodies letrec-body)
+      (value-of letrec-body (extend-env-rec* p-names b-vars p-bodies env)))
     [begin-exp (exp1 exps)
                (letrec
                  ([value-of-begins
@@ -324,5 +341,6 @@ the-store
 |#
 
 (value-of-program prog2)
+(value-of-program prog1)
 
 
