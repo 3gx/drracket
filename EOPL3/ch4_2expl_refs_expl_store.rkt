@@ -56,23 +56,16 @@
        "in" expression)
       letrec-exp)
 
-    ;; explicit-refs
 
     (expression
       ("begin" expression (arbno ";" expression) "end")
       begin-exp)
 
-    (expression
-      ("newref" "(" expression ")")
-      newref-exp)
+    ;; implicit-refs
 
     (expression
-      ("deref" "(" expression ")")
-      deref-exp)
-
-    (expression
-      ("setref" "(" expression "," expression ")")
-      setref-exp)
+      ("set" identifier "=" expression)
+      assign-exp)
 
     ))
 
@@ -281,19 +274,8 @@
                           v1
                           (value-of-begins (car es) (cdr es)))))])
                  (value-of-begins exp1 exps))]
-    [newref-exp (exp1)
-                (let ([v1 (value-of exp1 env)])
-                  (ref-val (newref v1)))]
-    [deref-exp (exp1)
-               (let* ([v1 (value-of exp1 env)]
-                      [ref1 (expval->ref v1)])
-                 (deref ref1))]
-    [setref-exp (exp1 exp2)
-                (let* ([ref (expval->ref (value-of exp1 env))]
-                       [val2 (value-of  exp2 env)])
-                  (begin
-                    (setref! ref val2)
-                    (num-val 23)))]))
+    [assign-exp (sym exp)
+                (error "unsupported")]))
 
 
 
@@ -311,37 +293,40 @@ the-store
 |#
 
 
+(define prog1 (scan&parse "
+          let x = 0
+          in letrec even(dummy)
+                = if zero?(x)
+                  then 1
+                  else begin
+                          set x = -(x,1);
+                          (odd 888)
+                      end
+                     odd(dummy)
+                = if zero?(x)
+                  then 0
+                  else begin
+                     set x = -(x,1);
+                     (even 888)
+                  end
+              in begin
+                set x = 13;
+                (odd -888)
+              end
+"))
+prog1
+
 (define prog2 (scan&parse "
-      let g = let counter = newref(0)
-              in proc (dummy) begin
-                    setref(counter, -(deref(counter), -1)); deref(counter)
-                end
-      in let a = (g 11)
-         in let b = (g 11)
-            in -(a,b)
+  let g = let count = 0
+          in proc (dummy)
+               begin
+                 set count = -(count,-1);
+                 count
+               end
+  in let a = (g 11)
+      in let b = (g 11)
+          in -(a,b)
 "))
 prog2
-(value-of-program prog2)
-
-(define prog1 (scan&parse "
-  let x = newref(0)
-  in letrec even(dummy)
-              = if zero?(deref(x))
-                then 1
-                else begin
-                      setref(x, -(deref(x),1));
-                      (odd 888)
-                     end
-            odd(dummy)
-             = if zero?(deref(x))
-               then 0
-               else begin
-                       setref(x, -(deref(x),1));
-                       (even 888)
-                    end
-      in begin setref(x,13); (odd 888) end
-                          "))
-prog1
-(value-of-program prog1)
 
 
