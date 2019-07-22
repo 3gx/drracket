@@ -110,3 +110,14 @@
       in begin setref(x,13); (odd 888) end
                           "))
 prog1
+
+(define prog2 (scan&parse "
+      let g = let counter = newref(0)
+              in proc (dummy) begin
+                    setref(counter, -(deref(counter), -1)); deref(counter)
+                end
+      in let a = (g 11)
+         in let b = (g 11)
+            in -(a,b)
+"))
+prog2
