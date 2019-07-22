@@ -336,7 +336,16 @@ prog1
 prog2
 (value-of-program prog2)
 
-(define prog3 (scan&parse "
+(define prog3a (scan&parse "
+   letrec times4(x) = if zero?(x)
+                      then 0
+                      else -((times4 -(x,1)), -4)
+   in (times4 3)
+"))
+prog3a
+(value-of-program prog3a)
+
+(define prog3b (scan&parse "
   let times4 = 0
   in begin
        set times4 = proc (x)
@@ -346,5 +355,5 @@ prog2
                    (times4 3)
       end
 "))
-prog3
-(value-of-program prog3)
+prog3b
+(value-of-program prog3b)
