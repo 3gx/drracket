@@ -162,11 +162,12 @@
       (cond
         [(location search-var p-names)
          => (lambda (n)
-              (proc-val
-                (procedure
-                  (list-ref b-vars n)
-                  (list-ref p-bodies n)
-                  env)))]
+              (newref
+                (proc-val
+                  (procedure
+                    (list-ref b-vars n)
+                    (list-ref p-bodies n)
+                    env))))]
         [else
           (apply-env saved-env search-var)]))))
 
@@ -189,7 +190,7 @@
 (define (apply-procedure proc1 val)
   (cases proc proc1
     (procedure (var body env)
-      (value-of body (extend-env var val env)))))
+      (value-of body (extend-env var (newref val) env)))))
 
 (define-datatype expval expval?
   (num-val
@@ -224,7 +225,7 @@
 (define (value-of exp env)
   (cases expression exp
     (const-exp (num) (num-val num))
-    (var-exp (var) (apply-env env var))
+    (var-exp (var) (deref (apply-env env var)))
     (diff-exp (exp1 exp2)
       (let* ([val1 (value-of exp1 env)]
              [val2 (value-of exp2 env)]
@@ -256,7 +257,7 @@
           (value-of exp3 env))))
     (let-exp (var exp1 body)
       (let ([val1 (value-of exp1 env)])
-        (value-of body (extend-env var val1 env))))
+        (value-of body (extend-env var (newref val1) env))))
     (proc-exp (var body)
       (proc-val (procedure var body env)))
     (call-exp (rator rand)
@@ -274,8 +275,12 @@
                           v1
                           (value-of-begins (car es) (cdr es)))))])
                  (value-of-begins exp1 exps))]
-    [assign-exp (sym exp)
-                (error "unsupported")]))
+    [assign-exp (var exp1)
+                (begin
+                  (setref!
+                    (apply-env env var)
+                    (value-of exp1 env))
+                  (num-val 27))]))
 
 
 
@@ -315,6 +320,7 @@ the-store
               end
 "))
 prog1
+;(value-of-program prog1)
 
 (define prog2 (scan&parse "
   let g = let count = 0
@@ -328,5 +334,4 @@ prog1
           in -(a,b)
 "))
 prog2
-
-
+;(value-of-program prog1)
