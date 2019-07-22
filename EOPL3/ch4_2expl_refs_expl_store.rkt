@@ -315,7 +315,7 @@ the-store
                      (even 888)
                   end
               in begin
-                set x = 13;
+                set x = 12;
                 (odd -888)
               end
 "))
@@ -334,4 +334,4 @@ prog1
           in -(a,b)
 "))
 prog2
-(value-of-program prog1)
+(value-of-program prog2)
