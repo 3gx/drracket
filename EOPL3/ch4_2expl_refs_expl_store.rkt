@@ -87,11 +87,11 @@
 
 (define (init-env)
   (extend-env
-    'i (num-val 1)
+    'i (newref (num-val 1))
     (extend-env
-      'v (num-val 5)
+      'v (newref (num-val 5))
       (extend-env
-        'x (num-val 10)
+        'x (newref (num-val 10))
         (empty-env)))))
 
 (define (value-of-program pgm)
@@ -142,7 +142,7 @@
   (empty-env)
   (extend-env
     (var symbol?)
-    (val expval?)
+    (val reference?)
     (env environment?))
   (extend-env-rec*
     (p-names (list-of symbol?))
@@ -320,7 +320,7 @@ the-store
               end
 "))
 prog1
-;(value-of-program prog1)
+(value-of-program prog1)
 
 (define prog2 (scan&parse "
   let g = let count = 0
@@ -334,4 +334,4 @@ prog1
           in -(a,b)
 "))
 prog2
-;(value-of-program prog1)
+(value-of-program prog1)
