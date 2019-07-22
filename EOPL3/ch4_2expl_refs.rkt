@@ -121,3 +121,32 @@ prog1
             in -(a,b)
 "))
 prog2
+
+(define (value-of-program pgm)
+  (initialize-store!)
+  [cases program pgm
+         (a-program (exp1)
+                    (value-of exp1 (init-env)))])
+
+(define (empty-store) '())
+
+(define the-store 'uninitialized)
+
+(define (get-store)
+  the-store)
+
+(define (initialize-store!)
+  (set! the-store (empty-store)))
+
+(define (reference? v)
+  (integer? v))
+
+(define (newref val)
+  (let ([next-ref (length the-store)])
+    (set! the-store (append the-store (list val)))))
+
+(define (deref ref)
+  (list-ref the-store ref))
+
+
+
