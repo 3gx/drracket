@@ -212,7 +212,7 @@
 (define (apply-procedure proc1 val)
   (cases proc proc1
     (procedure (var body env)
-      (value-of body (extend-env var (newref val) env)))))
+      (value-of body (extend-env var val env)))))
 
 (define-datatype expval expval?
   [num-val
@@ -291,7 +291,7 @@
       (proc-val (procedure var body env)))
     (call-exp (rator rand)
       (let ([proc (expval->proc (value-of rator env))]
-            [arg (value-of rand env)])
+            [arg (value-of-operand rand env)])
         (apply-procedure proc arg)))
     (letrec-exp (p-names b-vars p-bodies letrec-body)
       (value-of letrec-body (extend-env-rec* p-names b-vars p-bodies env)))
@@ -349,6 +349,12 @@ r2
 the-store
 (deref r2)
 |#
+
+(define (value-of-operand exp env)
+  (cases expression exp
+         [var-exp (var) (apply-env env var)]
+         [else
+           (newref (value-of exp env))]))
 
 
 (define prog1 (scan&parse "
@@ -451,3 +457,15 @@ prog3b
      "))
 prog4
 (value-of-program prog4)
+
+(define prog5 (scan&parse "
+  let b = 3
+  in let p = proc (x) proc (y)
+               begin
+                 set x = 4;
+                 y
+               end
+     in ((p b) b)
+     "))
+prog5
+(value-of-program prog5)
