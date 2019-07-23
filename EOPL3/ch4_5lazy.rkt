@@ -254,7 +254,15 @@
 (define (value-of exp env)
   (cases expression exp
     (const-exp (num) (num-val num))
-    (var-exp (var) (deref (apply-env env var)))
+    [var-exp (var)
+      (let* ([ref1 (apply-env env var)]
+             [w (deref ref1)])
+        (if (expval? w)
+          w
+          (let ([val1 (value-of-thunk w)])
+            (begin
+              (setref! ref1 val1)
+              val1))))]
     (diff-exp (exp1 exp2)
       (let* ([val1 (value-of exp1 env)]
              [val2 (value-of exp2 env)]
@@ -337,6 +345,16 @@
                      (setright p val2)
                      (num-val 82)))]))
 
+(define-datatype thunk thunk?
+  [a-thunk
+    (exp1 expression?)
+    (env environment?)])
+
+(define (value-of-thunk th)
+  (cases thunk th
+    [a-thunk (exp1 saved-env)
+             (value-of exp1 saved-env)]))
+
 #|
 (initialize-store!)
 (define r1 (newref 42))
@@ -354,7 +372,7 @@ the-store
   (cases expression exp
          [var-exp (var) (apply-env env var)]
          [else
-           (newref (value-of exp env))]))
+           (newref (a-thunk exp env))]))
 
 
 (define prog1 (scan&parse "
@@ -469,3 +487,11 @@ prog4
      "))
 prog5
 (value-of-program prog5)
+
+(define prog6 (scan&parse "
+  letrec infiniteloop (x) = (infiniteloop -(x,-1))
+  in let f = proc (z) 11
+      in (f (infiniteloop 0))
+      "))
+prog6
+(value-of-program prog6)
