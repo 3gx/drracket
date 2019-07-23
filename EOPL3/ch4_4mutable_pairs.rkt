@@ -67,6 +67,28 @@
       ("set" identifier "=" expression)
       assign-exp)
 
+    ;; mutable pairs
+
+    (expression
+      ("newpair" "(" expression "," expression ")")
+      newpair-exp)
+
+    (expression
+      ("left" "(" expression ")")
+      left-exp)
+
+    (expression
+      ("setleft" expression "=" expression)
+      setleft-exp)
+
+    (expression
+      ("right" "(" expression ")")
+      right-exp)
+
+    (expression
+      ("setright" expression "=" expression)
+      setright-exp)
+
     ))
 
 ;;;;;;;;;;;;;;;; sllgen boilerplate ;;;;;;;;;;;;;;;;
@@ -193,14 +215,16 @@
       (value-of body (extend-env var (newref val) env)))))
 
 (define-datatype expval expval?
-  (num-val
-    (value number?))
-  (bool-val
-    (boolean boolean?))
-  (proc-val
-    (proc proc?))
-  (ref-val
-    (ref reference?)))
+  [num-val
+    (value number?)]
+  [bool-val
+    (boolean boolean?)]
+  [proc-val
+    (proc proc?)]
+  [ref-val
+    (ref reference?)]
+  [mutpair-val
+    (p mutpair?)])
 
 (define (expval->num val)
   (cases expval val
@@ -216,6 +240,11 @@
   (cases expval val
     (ref-val (ref) ref)
     (else (error "failed to extract ref" val))))
+
+(define (expval->mutpair val)
+  (cases expval val
+         [mutpair-val (ref) ref]
+         [else (error "failed to extract mupair" val)]))
 
 (define (expval->proc val)
   (cases expval val
@@ -280,9 +309,33 @@
                   (setref!
                     (apply-env env var)
                     (value-of exp1 env))
-                  (num-val 27))]))
-
-
+                  (num-val 27))]
+    [newpair-exp (exp1 exp2)
+                 (let ([val1 (value-of exp1 env)]
+                       [val2 (value-of exp2 env)])
+                   (mutpair-val (make-pair val1 val2)))]
+    [left-exp (exp1)
+              (let* ([val1 (value-of exp1 env)]
+                     [p1 (expval->mutpair val1)])
+                (left p1))]
+    [right-exp (exp1)
+              (let* ([val1 (value-of exp1 env)]
+                     [p1 (expval->mutpair val1)])
+                (right p1))]
+    [setleft-exp (exp1 exp2)
+                 (let* ([val1 (value-of exp1 env)]
+                        [val2 (value-of exp2 env)]
+                        [p (expval->mutpair val1)])
+                   (begin
+                     (setleft p val2)
+                     (num-val 82)))]
+    [setright-exp (exp1 exp2)
+                 (let* ([val1 (value-of exp1 env)]
+                        [val2 (value-of exp2 env)]
+                        [p (expval->mutpair val1)])
+                   (begin
+                     (setright p val2)
+                     (num-val 82)))]))
 
 #|
 (initialize-store!)
@@ -357,3 +410,44 @@ prog3a
 "))
 prog3b
 (value-of-program prog3b)
+
+(define-datatype mutpair mutpair?
+  (a-pair
+    (left-loc reference?)
+    (right-loc reference?)))
+
+(define (make-pair val1 val2)
+  (a-pair
+    (newref val1)
+    (newref val2)))
+
+(define (left p)
+  (cases mutpair p
+         [a-pair (left-loc right-loc)
+                 (deref left-loc)]))
+
+(define (right p)
+  (cases mutpair p
+         [a-pair (left-loc right-loc)
+                 (deref right-loc)]))
+
+(define (setleft p val)
+  (cases mutpair p
+         [a-pair (left-loc right-loc)
+                 (setref! left-loc val)]))
+
+(define (setright p val)
+  (cases mutpair p
+         [a-pair (left-loc right-loc)
+                 (setref! right-loc val)]))
+
+(define prog4 (scan&parse "
+  let glo = newpair(44,31)
+  in let f = proc (loc)
+              let d1 = setright loc = left(loc)
+              in let d2 = setleft  glo  =  99
+                 in -(left(loc),right(loc))
+     in (f glo)
+     "))
+prog4
+(value-of-program prog4)
