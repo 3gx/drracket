@@ -103,6 +103,7 @@
     (b-var symbol?)
     (body expression?)
     (env environment?)))
+
 (define (apply-env env search-var)
   (cases environment env
     (empty-env ()
@@ -115,6 +116,107 @@
       (if (eqv? p-name search-var)
         (proc-val (procedure b-var p-body env))
         (apply-env saved-env search-var)))))
+
+(define-datatype continuation continuation?
+  [end-cont]
+  [zero1-cont
+    (saved-cont continuation?)]
+  [let-exp-cont
+    (var symbol?)
+    (body expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [if-test-cont
+    (exp2 expression?)
+    (exp3 expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [diff1-cont
+    (exp2 expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [diff2-cont
+    (val1 expval?)
+    (saved-cont continuation?)]
+  [plus1-cont
+    (exp2 expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [plus2-cont
+    (val1 expval?)
+    (saved-cont continuation?)]
+  [mul1-cont
+    (exp2 expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [mul2-cont
+    (val1 expval?)
+    (saved-cont continuation?)]
+  [rator-cont
+    (rand expression?)
+    (saved-env environment?)
+    (saved-cont continuation?)]
+  [rand-cont
+    (val1 expval?)
+    (saved-cont continuation?)])
+
+(define (apply-cont cont val)
+  (cases continuation cont
+    [end-cont ()
+              (begin
+                (println (format "End-of-computation: ~a" val))
+                (println ""))]
+    [zero1-cont (saved-cont)
+                (apply-cont saved-cont
+                            (bool-val
+                              (zero? (expval->num val))))]
+    [let-exp-cont (var body saved-env saved-cont)
+                  (value-of/k body
+                              (extend-env var val saved-env)
+                              saved-cont)]
+    [if-test-cont (exp2 exp3 saved-env saved-cont)
+                  (if (expval->bool val)
+                    (value-of/k exp2 saved-env saved-cont)
+                    (value-of/k exp3 saved-env saved-cont))]
+    [diff1-cont (exp2 saved-env saved-cont)
+                (value-of/k exp2 saved-env
+                            (diff2-cont val saved-cont))]
+    [diff2-cont (val1 saved-cont)
+                (let ([num1 (expval->num val1)]
+                      [num2 (expval->num val)])
+                  (apply-cont saved-cont
+                              (num-val (- num1 num2))))]
+    [plus1-cont (exp2 saved-env saved-cont)
+                (value-of/k exp2 saved-env
+                            (plus2-cont val saved-cont))]
+    [plus2-cont (val1 saved-cont)
+                (let ([num1 (expval->num val1)]
+                      [num2 (expval->num val)])
+                  (apply-cont saved-cont
+                              (num-val (+ num1 num2))))]
+    [mul1-cont (exp2 saved-env saved-cont)
+                (value-of/k exp2 saved-env
+                            (mul2-cont val saved-cont))]
+    [mul2-cont (val1 saved-cont)
+                (let ([num1 (expval->num val1)]
+                      [num2 (expval->num val)])
+                  (apply-cont saved-cont
+                              (num-val (* num1 num2))))]
+    [rator-cont (rand saved-env saved-cont)
+                (value-of/k rand saved-env
+                            (rand-cont val saved-cont))]
+    [rand-cont (val1 saved-cont)
+               (let ([proc (expval->proc val1)])
+                 (apply-procedure/k proc val saved-cont))]))
+
+
+(define (apply-procedure/k proc1 val cont)
+  (cases proc proc1
+    [procedure (var body saved-env)
+               (value-of/k body
+                           (extend-env var val saved-env)
+                           cont)]))
+
 
 (define (init-env)
   (extend-env
@@ -152,15 +254,11 @@
     (bool-val (bool) bool)
     (else (error "failed to extract bool" val))))
 
-(define (apply-procedure proc1 val)
-  (cases proc proc1
-    (procedure (var body env)
-      (value-of body (extend-env var val env)))))
-
 (define (expval->proc val)
   (cases expval val
     (proc-val (proc) proc)
     (else (error "failed to extract proc" val))))
+
 
 (define (run ast)
   (value-of-program ast))
@@ -168,53 +266,40 @@
 (define (value-of-program pgm)
   (cases program pgm
     (a-program (exp1)
-      (value-of exp1 (init-env)))))
+      (value-of/k exp1 (init-env) (end-cont)))))
 
-(define (value-of exp env)
+(define (value-of/k exp env cont)
   (cases expression exp
-    (const-exp (num) (num-val num))
-    (var-exp (var) (apply-env env var))
-    (diff-exp (exp1 exp2)
-      (let* ([val1 (value-of exp1 env)]
-             [val2 (value-of exp2 env)]
-             [num1 (expval->num val1)]
-             [num2 (expval->num val2)])
-        (num-val (- num1 num2))))
-    (plus-exp (exp1 exp2)
-      (let* ([val1 (value-of exp1 env)]
-             [val2 (value-of exp2 env)]
-             [num1 (expval->num val1)]
-             [num2 (expval->num val2)])
-        (num-val (+ num1 num2))))
-    (mul-exp (exp1 exp2)
-      (let* ([val1 (value-of exp1 env)]
-             [val2 (value-of exp2 env)]
-             [num1 (expval->num val1)]
-             [num2 (expval->num val2)])
-        (num-val (* num1 num2))))
-    (zero?-exp (exp1)
-      (let* ([val1 (value-of exp1 env)]
-             [num1 (expval->num val1)])
-        (if (zero? num1)
-          (bool-val #t)
-          (bool-val #f))))
-    (if-exp (exp1 exp2 exp3)
-      (let ([val1 (value-of exp1 env)])
-        (if (expval->bool val1)
-          (value-of exp2 env)
-          (value-of exp3 env))))
-    (let-exp (var exp1 body)
-      (let ([val1 (value-of exp1 env)])
-        (value-of body (extend-env var val1 env))))
-    (proc-exp (var body)
-      (proc-val (procedure var body env)))
-    (call-exp (rator rand)
-      (let ([proc (expval->proc (value-of rator env))]
-            [arg (value-of rand env)])
-        (apply-procedure proc arg)))
-    (letrec-exp (p-name b-var p-body letrec-body)
-      (value-of letrec-body (extend-env-rec p-name b-var p-body env)))))
-
+    [const-exp (num) (apply-cont cont (num-val num))]
+    [var-exp (var) (apply-cont cont (apply-env env var))]
+    [diff-exp (exp1 exp2)
+              (value-of/k exp1 env
+                          (diff1-cont exp2 env cont))]
+    [plus-exp (exp1 exp2)
+              (value-of/k exp1 env
+                          (plus1-cont exp2 env cont))]
+    [mul-exp (exp1 exp2)
+              (value-of/k exp1 env
+                          (mul1-cont exp2 env cont))]
+    [zero?-exp (exp1)
+               (value-of/k exp1 env
+                           (zero1-cont cont))]
+    [if-exp (exp1 exp2 exp3)
+            (value-of/k exp1 env
+                        (if-test-cont exp2 exp3 env cont))]
+    [let-exp (var exp1 body)
+             (value-of/k exp1 env
+                         (let-exp-cont var body env cont))]
+    [proc-exp (var body)
+              (apply-cont cont
+                  (proc-val (procedure var body env)))]
+    [call-exp (rator rand)
+              (value-of/k rator env
+                          (rator-cont rand env cont))]
+    [letrec-exp (p-name b-var p-body letrec-body)
+                (value-of/k letrec-body
+                            (extend-env-rec p-name b-var p-body env)
+                            cont)]))
 
 
 (define ast1
