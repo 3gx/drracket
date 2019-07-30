@@ -172,7 +172,7 @@
                   (set! g-env saved-env)
                   (if (expval->bool g-val)
                     (set! g-exp exp2)
-                    (set! g-exp exp2))
+                    (set! g-exp exp3))
                   (value-of/k)]
     [diff1-cont (exp2 saved-env saved-cont)
                 (set! g-exp exp2)
@@ -372,7 +372,7 @@ ast1
          in (odd 13)
   "))
 ast2
-(run ast2)
+;(run ast2)
 
 (define ast3
   (scan&parse "
