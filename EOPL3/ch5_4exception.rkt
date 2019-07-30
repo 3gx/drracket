@@ -57,6 +57,13 @@
        "in" expression)
       letrec-exp)
 
+    (expression
+     ("try" expression "catch" "(" identifier ")" expression)
+     try-exp)
+
+    (expression
+     ("raise" expression)
+     raise-exp)
     ))
 
 ;;;;;;;;;;;;;;;; sllgen boilerplate ;;;;;;;;;;;;;;;;
@@ -175,6 +182,13 @@
     (saved-cont continuation?)]
   [rand-cont
     (val1 expval?)
+    (saved-cont continuation?)]
+  [try-cont
+    (var symbol?)
+    (handler-exp expression?)
+    (env environment?)
+    (cont continuation?)]
+  [raise1-cont
     (saved-cont continuation?)])
 
 (define (apply-cont cont val)
