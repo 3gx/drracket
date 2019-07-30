@@ -211,11 +211,12 @@
 
 
 (define (apply-procedure/k proc1 val cont)
-  (cases proc proc1
-    [procedure (var body saved-env)
-               (value-of/k body
-                           (extend-env var val saved-env)
-                           cont)]))
+  (lambda ()
+    (cases proc proc1
+      [procedure (var body saved-env)
+                 (value-of/k body
+                             (extend-env var val saved-env)
+                           cont)])))
 
 
 (define (init-env)
@@ -266,7 +267,9 @@
 (define (trampoline bounce)
   (if (expval? bounce)
     bounce
-    (trampoline (bounce))))
+    (begin
+      (println "trampoline jump")
+      (trampoline (bounce)))))
 
 
 (define (value-of-program pgm)
