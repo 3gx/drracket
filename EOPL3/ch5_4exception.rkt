@@ -174,7 +174,7 @@
     (env environment?)
     (cont continuation?)]
   [raise1-cont
-    (saved-cont continuation)])
+    (saved-cont continuation?)])
 
 (define (apply-cont)
   (cases continuation g-cont
