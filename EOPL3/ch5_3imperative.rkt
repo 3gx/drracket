@@ -74,24 +74,7 @@
 
 
 
-(scan&parse "-(55, -(x,11))")
-(scan&parse "if 42 then 43 else 45")
-(scan&parse "
-  let f = proc(x) -(x,11)
-  in (f (f 77))
-  ")
-(scan&parse "
-  let f = proc(x) -(x,11)
-  in (f (f 77))
-  ")
-(scan&parse "
-  let x = 200
-  in let f = proc (z) -(z,x)
-     in let x = 100
-        in let g = proc (z) -(z,x)
-           in -((f 1), (g 1))
-           ")
-
+; environment
 (define-datatype environment environment?
   (empty-env)
   (extend-env
@@ -117,6 +100,15 @@
         (proc-val (procedure b-var p-body env))
         (apply-env saved-env search-var)))))
 
+; global registers
+(define g-exp 'uninitialized)
+(define g-env 'uninitialized)
+(define g-cont 'uninitialized)
+(define g-val 'uninitialized)
+(define g-proc1 'uninitialized)
+
+
+; continuation data-type
 (define-datatype continuation continuation?
   [end-cont]
   [zero1-cont
@@ -160,62 +152,79 @@
     (val1 expval?)
     (saved-cont continuation?)])
 
-(define (apply-cont cont val)
-  (cases continuation cont
+(define (apply-cont)
+  (cases continuation g-cont
     [end-cont ()
               (begin
                 (println "End-of-computation:")
-                val)]
+                g-val)]
     [zero1-cont (saved-cont)
-                (apply-cont saved-cont
-                            (bool-val
-                              (zero? (expval->num val))))]
+                (set! g-cont saved-cont)
+                (set! g-val (bool-val (zero? (expval->num g-val))))
+                (apply-cont)]
     [let-exp-cont (var body saved-env saved-cont)
-                  (value-of/k body
-                              (extend-env var val saved-env)
-                              saved-cont)]
+                  (set! g-exp body)
+                  (set! g-env (extend-env var g-val saved-env))
+                  (set! g-cont saved-cont)
+                  (value-of/k)]
     [if-test-cont (exp2 exp3 saved-env saved-cont)
-                  (if (expval->bool val)
-                    (value-of/k exp2 saved-env saved-cont)
-                    (value-of/k exp3 saved-env saved-cont))]
+                  (set! g-cont saved-cont)
+                  (set! g-env saved-env)
+                  (if (expval->bool g-val)
+                    (set! g-exp exp2)
+                    (set! g-exp exp2))
+                  (value-of/k)]
     [diff1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (diff2-cont val saved-cont))]
+                (set! g-exp exp2)
+                (set! g-env saved-env)
+                (set! g-cont (diff2-cont g-val saved-cont))
+                (value-of/k)]
     [diff2-cont (val1 saved-cont)
                 (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (- num1 num2))))]
+                      [num2 (expval->num g-val)])
+                  (set! g-cont saved-cont)
+                  (set! g-val (num-val (- num1 num2)))
+                  (apply-cont))]
     [plus1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (plus2-cont val saved-cont))]
+                (set! g-exp exp2)
+                (set! g-env saved-env)
+                (set! g-cont (plus2-cont g-val saved-cont))
+                (value-of/k)]
     [plus2-cont (val1 saved-cont)
                 (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (+ num1 num2))))]
+                      [num2 (expval->num g-val)])
+                  (set! g-cont saved-cont)
+                  (set! g-val (num-val (+ num1 num2)))
+                  (apply-cont))]
     [mul1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (mul2-cont val saved-cont))]
+               (set! g-exp exp2)
+               (set! g-env saved-env)
+               (set! g-cont (mul2-cont g-val saved-cont))
+               (value-of/k)]
     [mul2-cont (val1 saved-cont)
-                (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (* num1 num2))))]
+               (let ([num1 (expval->num val1)]
+                     [num2 (expval->num g-val)])
+                 (set! g-cont saved-cont)
+                 (set! g-val (num-val (* num1 num2)))
+                 (apply-cont))]
     [rator-cont (rand saved-env saved-cont)
-                (value-of/k rand saved-env
-                            (rand-cont val saved-cont))]
+                (set! g-exp rand)
+                (set! g-env saved-env)
+                (set! g-cont (rand-cont g-val saved-cont))
+                (value-of/k)]
     [rand-cont (val1 saved-cont)
                (let ([proc (expval->proc val1)])
-                 (apply-procedure/k proc val saved-cont))]))
+                 (set! g-proc1 proc)
+                 (set! g-cont saved-cont)
+                 (apply-procedure/k))]))
 
 
-(define (apply-procedure/k proc1 val cont)
-  (cases proc proc1
+(define (apply-procedure/k)
+  (cases proc g-proc1
     [procedure (var body saved-env)
-               (value-of/k body
-                           (extend-env var val saved-env)
-                           cont)]))
+               (set! g-exp body)
+               (set! g-env (extend-env var g-val saved-env))
+               (value-of/k)]))
 
 
 (define (init-env)
@@ -265,42 +274,85 @@
 
 (define (value-of-program pgm)
   (cases program pgm
-    (a-program (exp1)
-      (value-of/k exp1 (init-env) (end-cont)))))
+    [a-program (exp1)
+               (set! g-exp exp1)
+               (set! g-env (init-env))
+               (set! g-cont (end-cont))
+               (value-of/k)]))
 
-(define (value-of/k exp env cont)
-  (cases expression exp
-    [const-exp (num) (apply-cont cont (num-val num))]
-    [var-exp (var) (apply-cont cont (apply-env env var))]
+(define (value-of/k)
+  (cases expression g-exp
+    [const-exp (num)
+               (set! g-val (num-val num))
+               (apply-cont)]
+    [var-exp (var)
+             (set! g-val (apply-env g-env var))
+             (apply-cont)]
     [diff-exp (exp1 exp2)
-              (value-of/k exp1 env
-                          (diff1-cont exp2 env cont))]
+              (set! g-exp exp1)
+              (set! g-cont (diff1-cont exp2 g-env g-cont))
+              (value-of/k)]
     [plus-exp (exp1 exp2)
-              (value-of/k exp1 env
-                          (plus1-cont exp2 env cont))]
+              (set! g-exp exp1)
+              (set! g-cont (plus1-cont exp2 g-env g-cont))
+              (value-of/k)]
     [mul-exp (exp1 exp2)
-              (value-of/k exp1 env
-                          (mul1-cont exp2 env cont))]
+             (set! g-exp exp1)
+             (set! g-cont (mul1-cont exp2 g-env g-cont))
+             (value-of/k)]
     [zero?-exp (exp1)
-               (value-of/k exp1 env
-                           (zero1-cont cont))]
+               (set! g-exp exp1)
+               (set! g-cont (zero1-cont g-cont))
+               (value-of/k)]
     [if-exp (exp1 exp2 exp3)
-            (value-of/k exp1 env
-                        (if-test-cont exp2 exp3 env cont))]
+            (set! g-exp exp1)
+            (set! g-cont (if-test-cont exp2 exp3 g-env g-cont))
+            (value-of/k)]
     [let-exp (var exp1 body)
-             (value-of/k exp1 env
-                         (let-exp-cont var body env cont))]
+             (set! g-exp exp1)
+             (set! g-cont (let-exp-cont var body g-env g-cont))
+             (value-of/k)]
     [proc-exp (var body)
-              (apply-cont cont
-                  (proc-val (procedure var body env)))]
+              (set! g-val
+                  (proc-val (procedure var body g-env)))
+              (apply-cont)]
     [call-exp (rator rand)
-              (value-of/k rator env
-                          (rator-cont rand env cont))]
+              (set! g-exp rator)
+              (set! g-cont (rator-cont rand g-env g-cont))
+              (value-of/k)]
     [letrec-exp (p-name b-var p-body letrec-body)
-                (value-of/k letrec-body
-                            (extend-env-rec p-name b-var p-body env)
-                            cont)]))
+                (set! g-exp letrec-body)
+                (set! g-env (extend-env-rec p-name b-var p-body g-env))
+                (value-of/k)]))
 
+
+(define spgm0 (scan&parse "-(55, -(x,11))"))
+spgm0
+(run spgm0)
+(define spgm1 (scan&parse "if zero?(42) then 43 else 45"))
+spgm1
+(run spgm1)
+(define spgm2 (scan&parse "
+  let f = proc(x) -(x,11)
+  in (f (f 77))
+  "))
+spgm2
+(run spgm2)
+(define spgm3 (scan&parse "
+  let f = proc(x) -(x,11)
+  in (f (f 77))
+  "))
+spgm3
+(run spgm3)
+(define spgm4 (scan&parse "
+  let x = 200
+  in let f = proc (z) -(z,x)
+     in let x = 100
+        in let g = proc (z) -(z,x)
+           in -((f 1), (g 1))
+           "))
+spgm4
+(run spgm4)
 
 (define ast1
   (scan&parse "
@@ -320,7 +372,7 @@ ast1
          in (odd 13)
   "))
 ast2
-;(run ast2)
+(run ast2)
 
 (define ast3
   (scan&parse "
