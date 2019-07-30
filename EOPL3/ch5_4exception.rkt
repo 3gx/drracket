@@ -238,7 +238,45 @@
                             (rand-cont val saved-cont))]
     [rand-cont (val1 saved-cont)
                (let ([proc (expval->proc val1)])
-                 (apply-procedure/k proc val saved-cont))]))
+                 (apply-procedure/k proc val saved-cont))]
+    [try-cont (var handler-exp env cont)
+              (apply-cont cont val)]
+    [raise1-cont (cont)
+                (apply-handler val cont)]
+    ))
+
+(define (apply-handler val cont)
+  (cases continuation cont
+    [end-cont ()
+                (error "Uncaught-exception" val)]
+    [zero1-cont (saved-cont)
+                (apply-handler val saved-cont)]
+    [let-exp-cont (var body saved-env saved-cont)
+                  (apply-handler val saved-cont)]
+    [if-test-cont (exp2 exp3 saved-env saved-cont)
+                  (apply-handler val saved-cont)]
+    [diff1-cont (exp2 saved-env saved-cont)
+                (apply-handler val saved-cont)]
+    [diff2-cont (val1 saved-cont)
+                (apply-handler val saved-cont)]
+    [plus1-cont (exp2 saved-env saved-cont)
+                (apply-handler val saved-cont)]
+    [plus2-cont (val1 saved-cont)
+                (apply-handler val saved-cont)]
+    [mul1-cont (exp2 saved-env saved-cont)
+               (apply-handler val saved-cont)]
+    [mul2-cont (val1 saved-cont)
+               (apply-handler val saved-cont)]
+    [rator-cont (rand saved-env saved-cont)
+                (apply-handler val saved-cont)]
+    [rand-cont (val1 saved-cont)
+                (apply-handler val saved-cont)]
+    [try-cont (var handler-exp saved-env saved-cont)
+              (value-of/k handler-exp
+                          (extend-env var val saved-env)
+                          saved-cont)]
+    [raise1-cont (saved-cont)
+                (apply-handler val saved-cont)]))
 
 
 (define (apply-procedure/k proc1 val cont)
@@ -327,6 +365,12 @@
     [call-exp (rator rand)
               (value-of/k rator env
                           (rator-cont rand env cont))]
+    [try-exp (exp1 var handler-exp)
+             (value-of/k exp1 env
+                         (try-cont var handler-exp env cont))]
+    [raise-exp (exp1)
+               (value-of/k exp1 env
+                           (raise1-cont cont))]
     [letrec-exp (p-names b-vars p-bodies letrec-body)
                 (value-of/k letrec-body
                             (extend-env-rec* p-names b-vars p-bodies env)
