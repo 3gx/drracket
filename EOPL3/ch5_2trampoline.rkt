@@ -164,8 +164,8 @@
   (cases continuation cont
     [end-cont ()
               (begin
-                (println (format "End-of-computation: ~a" val))
-                (println ""))]
+                (println "End-of-computation")
+                val)]
     [zero1-cont (saved-cont)
                 (apply-cont saved-cont
                             (bool-val
@@ -263,10 +263,17 @@
 (define (run ast)
   (value-of-program ast))
 
+(define (trampoline bounce)
+  (if (expval? bounce)
+    bounce
+    (trampoline (bounce))))
+
+
 (define (value-of-program pgm)
   (cases program pgm
-    (a-program (exp1)
-      (value-of/k exp1 (init-env) (end-cont)))))
+    [a-program (exp1)
+      (trampoline
+        (value-of/k exp1 (init-env) (end-cont)))]))
 
 (define (value-of/k exp env cont)
   (cases expression exp
