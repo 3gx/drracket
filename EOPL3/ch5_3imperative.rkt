@@ -53,7 +53,7 @@
 
     (expression
       ("letrec"
-       identifier "(" identifier ")" "=" expression
+       (arbno identifier "(" identifier ")" "=" expression)
        "in" expression)
       letrec-exp)
 
@@ -81,24 +81,41 @@
     (var symbol?)
     (val expval?)
     (env environment?))
-  (extend-env-rec
-    (p-name symbol?)
-    (b-var symbol?)
-    (body expression?)
+  (extend-env-rec*
+    (p-names (list-of symbol?))
+    (b-vars (list-of symbol?))
+    (bodies (list-of expression?))
     (env environment?)))
 
 (define (apply-env env search-var)
   (cases environment env
-    (empty-env ()
-      (error "No binding for" search-var))
-    (extend-env (saved-var saved-val saved-env)
+    [empty-env ()
+      (error "No binding for" search-var)]
+    [extend-env (saved-var saved-val saved-env)
       (if (eqv? saved-var search-var)
         saved-val
-        (apply-env saved-env search-var)))
-    (extend-env-rec (p-name b-var p-body saved-env)
-      (if (eqv? p-name search-var)
-        (proc-val (procedure b-var p-body env))
-        (apply-env saved-env search-var)))))
+        (apply-env saved-env search-var))]
+    [extend-env-rec* (p-names b-vars p-bodies saved-env)
+      (cond
+        [(location search-var p-names)
+         => (lambda (n)
+              (proc-val
+                (procedure
+                  (list-ref b-vars n)
+                  (list-ref p-bodies n)
+                  env)))]
+        [else
+          (apply-env saved-env search-var)])]))
+
+(define location
+  (lambda (sym syms)
+    (cond
+      ((null? syms) #f)
+      ((eqv? sym (car syms)) 0)
+      ((location sym (cdr syms))
+       => (lambda (n)
+            (+ n 1)))
+      (else #f))))
 
 ; global registers
 (define g-exp 'uninitialized)
@@ -269,8 +286,8 @@
     (else (error "failed to extract proc" val))))
 
 
-(define (run ast)
-  (value-of-program ast))
+(define (run str ast)
+  (println (format "~a:~a" str (value-of-program ast))))
 
 (define (value-of-program pgm)
   (cases program pgm
@@ -320,30 +337,30 @@
               (set! g-exp rator)
               (set! g-cont (rator-cont rand g-env g-cont))
               (value-of/k)]
-    [letrec-exp (p-name b-var p-body letrec-body)
+    [letrec-exp (p-names b-vars p-bodies letrec-body)
                 (set! g-exp letrec-body)
-                (set! g-env (extend-env-rec p-name b-var p-body g-env))
+                (set! g-env (extend-env-rec* p-names b-vars p-bodies g-env))
                 (value-of/k)]))
 
 
 (define spgm0 (scan&parse "-(55, -(x,11))"))
 spgm0
-(run spgm0)
+(run 'spgm0 spgm0)
 (define spgm1 (scan&parse "if zero?(42) then 43 else 45"))
 spgm1
-(run spgm1)
+(run 'spgm1 spgm1)
 (define spgm2 (scan&parse "
   let f = proc(x) -(x,11)
   in (f (f 77))
   "))
 spgm2
-(run spgm2)
+(run 'spgm2 spgm2)
 (define spgm3 (scan&parse "
   let f = proc(x) -(x,11)
   in (f (f 77))
   "))
 spgm3
-(run spgm3)
+(run 'spgm3 spgm3)
 (define spgm4 (scan&parse "
   let x = 200
   in let f = proc (z) -(z,x)
@@ -352,7 +369,7 @@ spgm3
            in -((f 1), (g 1))
            "))
 spgm4
-(run spgm4)
+(run 'spgm4 spgm4)
 
 (define ast1
   (scan&parse "
@@ -361,18 +378,18 @@ spgm4
     in (double 6)
     "))
 ast1
-(run ast1)
+(run 'ast1 ast1)
 
 (define ast2
   (scan&parse "
       letrec even(x) =
-          if zero?(x) then 1 else (odd -(x,1))
-      in letrec odd(x) =
-            if zero?(x) then 0 else (even -(x,1))
+                if zero?(x) then 1 else (odd -(x,1))
+              odd(x) =
+                if zero?(x) then 0 else (even -(x,1))
          in (odd 13)
   "))
 ast2
-;(run ast2)
+(run 'ast2 ast2)
 
 (define ast3
   (scan&parse "
@@ -381,7 +398,7 @@ ast2
     in (fact 5)
   "))
 ast3
-(run ast3)
+(run 'ast3 ast3)
 
 (define ast4
   (scan&parse "
@@ -394,7 +411,7 @@ ast3
           in (times4 3)"
      ))
 ast4
-(run ast4)
+(run 'ast4 ast4)
 
 (define ast4a
   (scan&parse "
