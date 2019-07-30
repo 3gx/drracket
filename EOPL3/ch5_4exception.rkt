@@ -195,8 +195,8 @@
   (cases continuation cont
     [end-cont ()
               (begin
-                (println (format "End-of-computation: ~a" val))
-                (println ""))]
+                (println "End-of-computation:")
+                val)]
     [zero1-cont (saved-cont)
                 (apply-cont saved-cont
                             (bool-val
@@ -458,3 +458,36 @@ ast4
      ))
 ast4a
 ;(run ast4a) - runs infinitely
+
+
+(define ast5a
+  (scan&parse "
+      let t1 = proc(x) proc(y)
+                        if zero?(y)
+                        then raise 42
+                        else  +(x,y)
+      in ((t1 4) 3)"))
+ast5a
+(run 'ast5a ast5a)
+
+(define ast5b
+  (scan&parse "
+      let t1 = proc(x) proc(y)
+                        if zero?(y)
+                        then raise 42
+                        else  +(x,y)
+      in try ((t1 4) 3)
+         catch (exn) -(0,exn)"))
+ast5b
+(run 'ast5b ast5b)
+
+(define ast5c
+  (scan&parse "
+      let t1 = proc(x) proc(y)
+                        if zero?(y)
+                        then raise 42
+                        else  +(x,y)
+      in try ((t1 4) 0)
+         catch (exn) -(0,exn)"))
+ast5c
+(run 'ast5c ast5c)
