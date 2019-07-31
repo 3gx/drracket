@@ -371,7 +371,7 @@
   (cases proc proc1
     [procedure (var body saved-env)
                (value-of/k body
-                           (extend-env var val saved-env)
+                           (extend-env var (newref val) saved-env)
                            cont)]))
 
 
@@ -428,7 +428,7 @@
 (define (value-of/k exp env cont)
   (cases expression exp
     [const-exp (num) (apply-cont cont (num-val num))]
-    [var-exp (var) (apply-cont cont (apply-env env var))]
+    [var-exp (var) (apply-cont cont (deref (apply-env env var)))]
     [diff-exp (exp1 exp2)
               (value-of/k exp1 env
                           (diff1-cont exp2 env cont))]
