@@ -134,7 +134,7 @@
   (empty-env)
   (extend-env
     (var symbol?)
-    (val expval?)
+    (val reference?)
     (env environment?))
   (extend-env-rec*
     (p-names (list-of symbol?))
@@ -154,11 +154,12 @@
       (cond
         [(location search-var p-names)
          => (lambda (n)
-              (proc-val
-                (procedure
-                  (list-ref b-vars n)
-                  (list-ref p-bodies n)
-                  env)))]
+              (newref
+                (proc-val
+                  (procedure
+                    (list-ref b-vars n)
+                    (list-ref p-bodies n)
+                    env))))]
         [else
           (apply-env saved-env search-var)])]))
 
@@ -274,7 +275,7 @@
                 val)]
     [let-exp-cont (var body saved-env saved-cont)
                   (value-of/k body
-                              (extend-env var val saved-env)
+                              (extend-env var (newref val) saved-env)
                               saved-cont)]
     [if-test-cont (exp2 exp3 saved-env saved-cont)
                   (if (expval->bool val)
@@ -359,7 +360,7 @@
                 (apply-handler val saved-cont)]
     [try-cont (var handler-exp saved-env saved-cont)
               (value-of/k handler-exp
-                          (extend-env var val saved-env)
+                          (extend-env var (newref val) saved-env)
                           saved-cont)]
     [set-rhs-cont (loc saved-cont)
                   (apply-handler loc saved-cont)]
@@ -377,11 +378,11 @@
 
 (define (init-env)
   (extend-env
-    'i (num-val 1)
+    'i (newref (num-val 1))
     (extend-env
-      'v (num-val 5)
+      'v (newref (num-val 5))
       (extend-env
-        'x (num-val 10)
+        'x (newref (num-val 10))
         (empty-env)))))
 
 (define-datatype proc proc?
@@ -421,6 +422,7 @@
   (println (format "~a:~a" str (value-of-program ast))))
 
 (define (value-of-program pgm)
+  (initialize-store!)
   (cases program pgm
     (a-program (exp1)
       (value-of/k exp1 (init-env) (end-cont)))))
