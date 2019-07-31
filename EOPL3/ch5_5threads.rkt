@@ -30,10 +30,6 @@
      mul-exp)
 
     (expression
-     ("zero?" "(" expression ")")
-     zero?-exp)
-
-    (expression
      ("if" expression "then" expression "else" expression)
      if-exp)
 
@@ -62,8 +58,43 @@
      try-exp)
 
     (expression
+      ("set" identifier "=" expression)
+      set-exp)
+
+    (expression
+     ("spawn" "(" expression ")")
+     spawn-exp)
+
+    (expression
+     ("yield" "(" ")")
+     yield-exp)
+
+    (expression
+     ("mutex" "(" ")")
+     mutex-exp)
+
+    (expression
+     ("wait" "(" expression ")")
+     wait-exp)
+
+    (expression
+     ("signal" "(" expression ")")
+     signal-exp)
+
+    (expression
      ("raise" expression)
      raise-exp)
+
+    (expression
+     (unop "(" expression ")")
+     unop-exp)
+
+    (unop ("car") car-unop)
+    (unop ("cdr") cdr-unop)
+    (unop ("null?") null?-unop)
+    (unop ("zero?") zero?-unop)
+    (unop ("print") print-unop)
+
     ))
 
 ;;;;;;;;;;;;;;;; sllgen boilerplate ;;;;;;;;;;;;;;;;
@@ -143,7 +174,8 @@
 
 (define-datatype continuation continuation?
   [end-cont]
-  [zero1-cont
+  [unop-arg-cont
+    (unop1 unop?)
     (saved-cont continuation?)]
   [let-exp-cont
     (var symbol?)
@@ -189,7 +221,50 @@
     (env environment?)
     (cont continuation?)]
   [raise1-cont
-    (saved-cont continuation?)])
+    (saved-cont continuation?)]
+  [set-rhs-cont
+    (loc reference?)
+    (cont continuation?)]
+  )
+
+(define (empty-store) '())
+
+(define the-store 'uninitialized)
+
+(define (get-store)
+  the-store)
+
+(define (initialize-store!)
+  (set! the-store (empty-store)))
+
+(define (reference? v)
+  (integer? v))
+
+(define (newref val)
+  (let ([next-ref (length the-store)])
+    (set! the-store (append the-store (list val)))
+    next-ref))
+
+(define (deref ref)
+  (list-ref the-store ref))
+
+(define (setref! ref val)
+  (set! the-store
+    (letrec
+      ([setref-inner
+         (lambda (store1 ref1)
+           (cond
+             [(null? store1)
+              (error "Invalid ref" ref the-store)]
+             [(zero? ref1)
+              (cons val (cdr store1))]
+             [else
+               (cons
+                 (car store1)
+                 (setref-inner
+                   (cdr store1) (sub1 ref1)))]))])
+      (setref-inner the-store ref))))
+
 
 (define (apply-cont cont val)
   (cases continuation cont
@@ -197,10 +272,6 @@
               (begin
                 (println "End-of-computation:")
                 val)]
-    [zero1-cont (saved-cont)
-                (apply-cont saved-cont
-                            (bool-val
-                              (zero? (expval->num val))))]
     [let-exp-cont (var body saved-env saved-cont)
                   (value-of/k body
                               (extend-env var val saved-env)
@@ -243,13 +314,28 @@
               (apply-cont cont val)]
     [raise1-cont (cont)
                 (apply-handler val cont)]
+    [unop-arg-cont (unop1 cont)
+                   (apply-unop unop1 val cont)]
+    [set-rhs-cont (loc cont)
+                  (begin
+                    (setref! loc val)
+                    (apply-cont cont (num-val 26)))]
     ))
+
+(define (apply-unop unop1 arg cont)
+  (cases unop unop1
+    [zero?-unop ()
+                (apply-cont cont
+                            (bool-val
+                              (zero? (expval->num arg))))]
+    [else (error "Unsupported unop"  unop1)]))
+
 
 (define (apply-handler val cont)
   (cases continuation cont
     [end-cont ()
                 (error "Uncaught-exception" val)]
-    [zero1-cont (saved-cont)
+    [unop-arg-cont (unop1 saved-cont)
                 (apply-handler val saved-cont)]
     [let-exp-cont (var body saved-env saved-cont)
                   (apply-handler val saved-cont)]
@@ -275,6 +361,8 @@
               (value-of/k handler-exp
                           (extend-env var val saved-env)
                           saved-cont)]
+    [set-rhs-cont (loc saved-cont)
+                  (apply-handler loc saved-cont)]
     [raise1-cont (saved-cont)
                 (apply-handler val saved-cont)]))
 
@@ -350,9 +438,6 @@
     [mul-exp (exp1 exp2)
               (value-of/k exp1 env
                           (mul1-cont exp2 env cont))]
-    [zero?-exp (exp1)
-               (value-of/k exp1 env
-                           (zero1-cont cont))]
     [if-exp (exp1 exp2 exp3)
             (value-of/k exp1 env
                         (if-test-cont exp2 exp3 env cont))]
@@ -374,7 +459,15 @@
     [letrec-exp (p-names b-vars p-bodies letrec-body)
                 (value-of/k letrec-body
                             (extend-env-rec* p-names b-vars p-bodies env)
-                            cont)]))
+                            cont)]
+    [set-exp (id1 exp1)
+             (value-of/k exp1 env
+                         (set-rhs-cont (apply-env env id1) cont))]
+    [unop-exp (unop1 exp1)
+               (value-of/k exp1 env
+                           (unop-arg-cont unop1 cont))]
+    [else (error "Unsupported" 'exp)]
+    ))
 
 (define spgm0 (scan&parse "-(55, -(x,11))"))
 spgm0
