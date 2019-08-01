@@ -344,6 +344,13 @@
     [cdr-unop ()
               (let [(lst (expval->list arg))]
                 (apply-cont cont (list-val (cdr lst))))]
+    [null?-unop ()
+                (apply-cont cont
+                            (bool-val (null? (expval->list arg))))]
+    [print-unop ()
+                (begin
+                  (eopl:printf "~a~%" (expval->num arg))
+                  (apply-cont cont (num-val 1)))]
     [else (error "Unsupported unop"  unop1)]))
 
 
@@ -681,3 +688,23 @@ ast8a
   in cdr(lsst)"))
 ast8a
 (run 'ast8b ast8b)
+
+(define thread1 (scan&parse "
+  letrec
+    noisy (l) = if null?(l)
+                then 0
+                else begin
+                       print(car(l));
+                       (noisy cdr(l))
+                     end
+   in
+     begin
+      spawn(proc (d) (noisy [1,2,3,4,5]));
+      spawn(proc (d) (noisy [6,7,8,9,10]));
+      print(100);
+      33
+     end
+    "))
+thread1
+#(run 'thread1 thread1)
+        
