@@ -457,6 +457,11 @@
     (body expression?)
     (env environment?)))
 
+(define-datatype mutex mutex?
+  [a-mutex
+    (ref-to-closed? reference?)
+    (ref-to-wait-queue? reference?)])
+
 
 
 
@@ -469,8 +474,8 @@
     (proc proc?)]
   [list-val
     (lst (list-of expval?))]
-  ;[mutex-val
-  ;  (mutex mutex?)]
+  [mutex-val
+    (mutex mutex?)]
   )
 
 (define (expval->num val)
