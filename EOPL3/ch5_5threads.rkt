@@ -99,6 +99,11 @@
     (unop ("zero?") zero?-unop)
     (unop ("print") print-unop)
 
+    (expression
+      ("[" (separated-list number ",") "]")
+      const-list-exp)
+
+
     ))
 
 ;;;;;;;;;;;;;;;; sllgen boilerplate ;;;;;;;;;;;;;;;;
@@ -333,6 +338,12 @@
                 (apply-cont cont
                             (bool-val
                               (zero? (expval->num arg))))]
+    [car-unop ()
+              (let [(lst (expval->list arg))]
+                (apply-cont cont (car lst)))]
+    [cdr-unop ()
+              (let [(lst (expval->list arg))]
+                (apply-cont cont (list-val (cdr lst))))]
     [else (error "Unsupported unop"  unop1)]))
 
 
@@ -399,12 +410,17 @@
 
 
 (define-datatype expval expval?
-  (num-val
-    (value number?))
-  (bool-val
-    (boolean boolean?))
-  (proc-val
-    (proc proc?)))
+  [num-val
+    (value number?)]
+  [bool-val
+    (boolean boolean?)]
+  [proc-val
+    (proc proc?)]
+  [list-val
+    (lst (list-of expval?))]
+  ;[mutex-val
+  ;  (mutex mutex?)]
+  )
 
 (define (expval->num val)
   (cases expval val
@@ -420,6 +436,17 @@
   (cases expval val
     (proc-val (proc) proc)
     (else (error "failed to extract proc" val))))
+
+(define expval->list
+  (lambda (v)
+    (cases expval v
+      (list-val (lst) lst)
+      (else (expval-extractor-error 'list v)))))
+
+(define expval-extractor-error
+  (lambda (variant value)
+    (eopl:error 'expval-extractors "Looking for a ~s, found ~s"
+                variant value)))
 
 
 (define (run str ast)
@@ -483,7 +510,11 @@
     [unop-exp (unop1 exp1)
                (value-of/k exp1 env
                            (unop-arg-cont unop1 cont))]
-    [else (error "Unsupported" 'exp)]
+    [const-list-exp (nums)
+                    (apply-cont cont
+                                (list-val (map num-val nums)))]
+
+    [else (error "Unsupported" exp)]
     ))
 
 (define fresh-identifier
@@ -638,3 +669,15 @@ ast6
 "))
 ast7
 (run 'ast7 ast7)
+
+(define ast8a (scan&parse "
+  let lsst = [8,2,3,4,5]
+  in car(lsst)"))
+ast8a
+(run 'ast8a ast8a)
+
+(define ast8b (scan&parse "
+  let lsst = [8,2,3,4,5]
+  in cdr(lsst)"))
+ast8a
+(run 'ast8b ast8b)
