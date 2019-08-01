@@ -809,3 +809,17 @@ thread1
 "))
 thread2
 (run 'thread2 thread2)
+
+(define thread3 (scan&parse "
+  let x = 0
+  in let incr_x = proc (id) proc (dummy)
+                    set x = -(x,-1)
+  in begin
+      spawn( (incr_x 100));
+      spawn( (incr_x 200));
+      spawn( (incr_x 300));
+      x
+     end
+     "))
+thread3
+(run 'thread3 thread3)
