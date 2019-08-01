@@ -196,7 +196,8 @@
       (cond
         [(deref ref-to-closed?)
          (setref! ref-to-wait-queue
-                  (enqueue (deref ref-to-wait-queue) th))]
+                  (enqueue (deref ref-to-wait-queue) th))
+         (run-next-thread)]
         [else
           (setref! ref-to-closed? #t)
           (th)])]))
@@ -206,15 +207,15 @@
     [a-mutex (ref-to-closed? ref-to-wait-queue)
       (let ([closed? (deref ref-to-closed?)]
             [wait-queue (deref ref-to-wait-queue)])
-        (if closed?
+        (when closed?
           (if (empty? wait-queue)
             (setref! ref-to-closed? #f)
             (dequeue wait-queue
               (lambda (first-waiting-th other-waiting-ths)
                 (place-on-ready-queue! first-waiting-th)
                 (setref! ref-to-wait-queue
-                         other-waiting-ths))))
-          (th)))]))
+                         other-waiting-ths)))))
+          (th))]))
 
 
 ; continuation
@@ -640,6 +641,11 @@
     [spawn-exp (exp1)
                (value-of/k exp1 env
                            (spawn-cont cont))]
+    [yield-exp ()
+               (place-on-ready-queue!
+                 (lambda ()
+                   (apply-cont cont (num-val 99))))
+               (run-next-thread)]
     [mutex-exp ()
                (apply-cont cont (mutex-val (new-mutex)))]
     [wait-exp (exp1)
@@ -872,14 +878,15 @@ thread2
                     begin
                       wait(mut);
                       set x = -(x,-1);
+                      set x = -(x,-1);
+                      print(x);
                       signal(mut)
-                      x
                     end
   in begin
       spawn( (incr_x 100));
       spawn( (incr_x 200));
       spawn( (incr_x 300));
-      x
+      yield()
      end
      "))
 thread3
