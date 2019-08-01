@@ -120,25 +120,6 @@
   (sllgen:make-string-scanner the-lexical-spec the-grammar))
 
 
-
-(scan&parse "-(55, -(x,11))")
-(scan&parse "if 42 then 43 else 45")
-(scan&parse "
-  let f = proc(x) -(x,11)
-  in (f (f 77))
-  ")
-(scan&parse "
-  let f = proc(x) -(x,11)
-  in (f (f 77))
-  ")
-(scan&parse "
-  let x = 200
-  in let f = proc (z) -(z,x)
-     in let x = 100
-        in let g = proc (z) -(z,x)
-           in -((f 1), (g 1))
-           ")
-
 (define-datatype environment environment?
   (empty-env)
   (extend-env
@@ -203,6 +184,41 @@
   (set! the-time-remaining the-max-time-slice))
 
 
+; mutex
+(define (new-mutex)
+  (a-mutex
+    (newref #f)
+    (newref '())))
+
+(define (wait-for-mutex m th)
+  (cases mutex m
+    [a-mutex (ref-to-closed? ref-to-wait-queue)
+      (cond
+        [(deref ref-to-closed?)
+         (setref! ref-to-wait-queue
+                  (enqueue (deref ref-to-wait-queue) th))]
+        [else
+          (setref! ref-to-closed? #t)
+          (th)])]))
+
+(define (signal-mutex m th)
+  (cases mutex m
+    [a-mutex (ref-to-closed? ref-to-wait-queue)
+      (let ([closed? (deref ref-to-closed?)]
+            [wait-queue (deref ref-to-wait-queue)])
+        (if closed?
+          (if (empty? wait-queue)
+            (setref! ref-to-closed? #f)
+            (dequeue wait-queue
+              (lambda (first-waiting-th other-waiting-ths)
+                (place-on-ready-queue! first-waiting-th)
+                (setref! ref-to-wait-queue
+                         other-waiting-ths))))
+          (th)))]))
+
+
+; continuation
+
 (define-datatype continuation continuation?
   [end-main-thread-cont]
   [end-subthread-cont]
@@ -258,6 +274,10 @@
     (loc reference?)
     (cont continuation?)]
   [spawn-cont
+    (saved-cont continuation?)]
+  [wait-cont
+    (saved-cont continuation?)]
+  [signal-cont
     (saved-cont continuation?)]
   )
 
@@ -370,6 +390,16 @@
                                    (num-val 28)
                                    (end-subthread-cont))))
             (apply-cont saved-cont (num-val 73)))]
+        [wait-cont (saved-cont)
+                   (wait-for-mutex
+                     (expval->mutex val)
+                     (lambda ()
+                       (apply-cont saved-cont (num-val 42))))]
+        [signal-cont (saved-cont)
+                       (signal-mutex
+                         (expval->mutex val)
+                         (lambda ()
+                           (apply-cont saved-cont (num-val 53))))]
         ))))
 
 (define (apply-unop unop1 arg cont)
@@ -402,6 +432,10 @@
                 (error "Uncaught-exception in a subthread" val)]
     [spawn-cont (saved-cont)
                 (apply-handler val saved-cont)]
+    [signal-cont (saved-cont)
+                 (apply-handler val saved-cont)]
+    [wait-cont (saved-cont)
+               (apply-handler val wait-cont)]
     [unop-arg-cont (unop1 saved-cont)
                 (apply-handler val saved-cont)]
     [let-exp-cont (var body saved-env saved-cont)
@@ -504,6 +538,13 @@
     (eopl:error 'expval-extractors "Looking for a ~s, found ~s"
                 variant value)))
 
+(define expval->mutex
+  (lambda (v)
+    (cases expval v
+      (mutex-val (l) l)
+      (else (expval-extractor-error 'mutex v)))))
+
+
 
 (define (run str ast)
   (println (format "~a:~a" str (value-of-program 1 ast))))
@@ -599,6 +640,15 @@
     [spawn-exp (exp1)
                (value-of/k exp1 env
                            (spawn-cont cont))]
+    [mutex-exp ()
+               (apply-cont cont (mutex-val (new-mutex)))]
+    [wait-exp (exp1)
+              (value-of/k exp1 env
+                          (wait-cont cont))]
+    [signal-exp (exp1)
+                (value-of/k exp1 env
+                            (signal-cont cont))]
+
     [else (error "Unsupported" exp)]
     ))
 
