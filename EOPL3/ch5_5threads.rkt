@@ -708,3 +708,31 @@ ast8a
 thread1
 ;(run 'thread1 thread1)
 
+(define thread2 (scan&parse "
+  let buffer = 0
+  in let producer =
+      proc (n)
+        letrec
+          wait1(k) = if zero?(k)
+                    then set buffer = n
+                    else begin
+                           print(+(k,200));
+                           (wait1 -(k,1))
+                         end
+        in (wait1 5)
+     in let consumer = proc(d)
+              letrec busywait1 (k) = if zero?(buffer)
+                                    then begin
+                                           print(+(k,100));
+                                           (busywait1 -(k,-1))
+                                         end
+                                    else buffer
+              in (busywait1 0)
+        in begin
+             spawn (proc (d) (producer 44));
+             print(300);
+             (consumer 86)
+           end
+"))
+thread2
+;(run 'thread2 thread2)
