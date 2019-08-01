@@ -58,6 +58,10 @@
      try-exp)
 
     (expression
+      ("begin" expression (arbno ";" expression) "end")
+      begin-exp)
+
+    (expression
       ("set" identifier "=" expression)
       set-exp)
 
@@ -462,6 +466,17 @@
                 (value-of/k letrec-body
                             (extend-env-rec* p-names b-vars p-bodies env)
                             cont)]
+    [begin-exp (exp1 exps)
+               (if (null? exps)
+                 (value-of/k exp1 env cont)
+                 (value-of/k
+                   (call-exp
+                     (proc-exp
+                       (fresh-identifier 'dummy)
+                       (begin-exp (car exps) (cdr exps)))
+                     exp1)
+                   env cont))]
+
     [set-exp (id1 exp1)
              (value-of/k exp1 env
                          (set-rhs-cont (apply-env env id1) cont))]
@@ -470,6 +485,16 @@
                            (unop-arg-cont unop1 cont))]
     [else (error "Unsupported" 'exp)]
     ))
+
+(define fresh-identifier
+  (let ((sn 0))
+    (lambda (identifier)  
+      (set! sn (+ sn 1))
+      (string->symbol
+       (string-append
+        (symbol->string identifier)
+        "%"             ; this can't appear in an input identifier
+        (number->string sn))))))
 
 (define spgm0 (scan&parse "-(55, -(x,11))"))
 spgm0
@@ -586,3 +611,30 @@ ast5b
          catch (exn) -(0,exn)"))
 ast5c
 (run 'ast5c ast5c)
+
+(define ast6 (scan&parse "
+  let g = let count = 0
+          in proc (dummy)
+               begin
+                 set count = -(count,-1);
+                 count
+               end
+  in let a = (g 11)
+      in let b = (g 11)
+          in -(a,b)
+"))
+ast6
+(run 'ast6 ast6)
+
+(define ast7 (scan&parse "
+  let times4 = 0
+  in begin
+       set times4 = proc (x)
+                     if zero?(x)
+                     then 0
+                     else -((times4 -(x,1)), -4); 
+                   (times4 3)
+      end
+"))
+ast7
+(run 'ast7 ast7)
