@@ -873,6 +873,7 @@ thread2
                       wait(mut);
                       set x = -(x,-1);
                       signal(mut)
+                      x
                     end
   in begin
       spawn( (incr_x 100));
