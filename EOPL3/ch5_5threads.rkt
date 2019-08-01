@@ -301,69 +301,76 @@
 
 
 (define (apply-cont cont val)
-  (cases continuation cont
-    [end-main-thread-cont ()
-                          (set-final-answer! val)
-                          (run-next-thread)]
-    [end-subthread-cont ()
-                        (run-next-thread)]
-    [let-exp-cont (var body saved-env saved-cont)
-                  (value-of/k body
-                              (extend-env var (newref val) saved-env)
-                              saved-cont)]
-    [if-test-cont (exp2 exp3 saved-env saved-cont)
-                  (if (expval->bool val)
-                    (value-of/k exp2 saved-env saved-cont)
-                    (value-of/k exp3 saved-env saved-cont))]
-    [diff1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (diff2-cont val saved-cont))]
-    [diff2-cont (val1 saved-cont)
-                (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (- num1 num2))))]
-    [plus1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (plus2-cont val saved-cont))]
-    [plus2-cont (val1 saved-cont)
-                (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (+ num1 num2))))]
-    [mul1-cont (exp2 saved-env saved-cont)
-                (value-of/k exp2 saved-env
-                            (mul2-cont val saved-cont))]
-    [mul2-cont (val1 saved-cont)
-                (let ([num1 (expval->num val1)]
-                      [num2 (expval->num val)])
-                  (apply-cont saved-cont
-                              (num-val (* num1 num2))))]
-    [rator-cont (rand saved-env saved-cont)
-                (value-of/k rand saved-env
-                            (rand-cont val saved-cont))]
-    [rand-cont (val1 saved-cont)
-               (let ([proc (expval->proc val1)])
-                 (apply-procedure/k proc val saved-cont))]
-    [try-cont (var handler-exp env cont)
-              (apply-cont cont val)]
-    [raise1-cont (cont)
-                (apply-handler val cont)]
-    [unop-arg-cont (unop1 cont)
-                   (apply-unop unop1 val cont)]
-    [set-rhs-cont (loc cont)
-                  (begin
-                    (setref! loc val)
-                    (apply-cont cont (num-val 26)))]
-    [spawn-cont (saved-cont)
-      (let ([proc1 (expval->proc val)])
-        (place-on-ready-queue!
-          (lambda ()
-            (apply-procedure/k proc1
-                               (num-val 28)
-                               (end-subthread-cont))))
-        (apply-cont saved-cont (num-val 73)))]
-    ))
+  (if (time-expired?)
+    (begin
+      (place-on-ready-queue!
+        (lambda () (apply-cont cont val)))
+      (run-next-thread))
+    (begin
+      (decrement-timer!)
+      (cases continuation cont
+        [end-main-thread-cont ()
+                              (set-final-answer! val)
+                              (run-next-thread)]
+        [end-subthread-cont ()
+                            (run-next-thread)]
+        [let-exp-cont (var body saved-env saved-cont)
+                      (value-of/k body
+                                  (extend-env var (newref val) saved-env)
+                                  saved-cont)]
+        [if-test-cont (exp2 exp3 saved-env saved-cont)
+                      (if (expval->bool val)
+                        (value-of/k exp2 saved-env saved-cont)
+                        (value-of/k exp3 saved-env saved-cont))]
+        [diff1-cont (exp2 saved-env saved-cont)
+                    (value-of/k exp2 saved-env
+                                (diff2-cont val saved-cont))]
+        [diff2-cont (val1 saved-cont)
+                    (let ([num1 (expval->num val1)]
+                          [num2 (expval->num val)])
+                      (apply-cont saved-cont
+                                  (num-val (- num1 num2))))]
+        [plus1-cont (exp2 saved-env saved-cont)
+                    (value-of/k exp2 saved-env
+                                (plus2-cont val saved-cont))]
+        [plus2-cont (val1 saved-cont)
+                    (let ([num1 (expval->num val1)]
+                          [num2 (expval->num val)])
+                      (apply-cont saved-cont
+                                  (num-val (+ num1 num2))))]
+        [mul1-cont (exp2 saved-env saved-cont)
+                    (value-of/k exp2 saved-env
+                                (mul2-cont val saved-cont))]
+        [mul2-cont (val1 saved-cont)
+                    (let ([num1 (expval->num val1)]
+                          [num2 (expval->num val)])
+                      (apply-cont saved-cont
+                                  (num-val (* num1 num2))))]
+        [rator-cont (rand saved-env saved-cont)
+                    (value-of/k rand saved-env
+                                (rand-cont val saved-cont))]
+        [rand-cont (val1 saved-cont)
+                   (let ([proc (expval->proc val1)])
+                     (apply-procedure/k proc val saved-cont))]
+        [try-cont (var handler-exp env cont)
+                  (apply-cont cont val)]
+        [raise1-cont (cont)
+                    (apply-handler val cont)]
+        [unop-arg-cont (unop1 cont)
+                       (apply-unop unop1 val cont)]
+        [set-rhs-cont (loc cont)
+                      (begin
+                        (setref! loc val)
+                        (apply-cont cont (num-val 26)))]
+        [spawn-cont (saved-cont)
+          (let ([proc1 (expval->proc val)])
+            (place-on-ready-queue!
+              (lambda ()
+                (apply-procedure/k proc1
+                                   (num-val 28)
+                                   (end-subthread-cont))))
+            (apply-cont saved-cont (num-val 73)))]
+        ))))
 
 (define (apply-unop unop1 arg cont)
   (cases unop unop1
@@ -772,7 +779,7 @@ ast8a
      end
     "))
 thread1
-;(run 'thread1 thread1)
+(run 'thread1 thread1)
 
 (define thread2 (scan&parse "
   let buffer = 0
@@ -801,4 +808,4 @@ thread1
            end
 "))
 thread2
-;(run 'thread2 thread2)
+(run 'thread2 thread2)
