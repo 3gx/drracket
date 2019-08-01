@@ -706,5 +706,5 @@ ast8a
      end
     "))
 thread1
-#(run 'thread1 thread1)
-        
+;(run 'thread1 thread1)
+
