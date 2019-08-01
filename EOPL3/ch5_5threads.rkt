@@ -182,8 +182,30 @@
             (+ n 1)))
       (else #f))))
 
+; queue
+(define (empty-queue) '())
+(define empty? null?)
+(define (enqueue q val)
+  (append q (list val)))
+
+(define (dequeue q f)
+  (f (car q) (cdr q)))
+
+; scheduler
+(define the-ready-queue   'uninitialized)
+(define the-final-answer  'uninitialized)
+(define the-max-time-slice    'uninitialized)
+(define the-time-remaining    'uninitialized)
+(define (initialize-scheduler! ticks)
+  (set! the-ready-queue (empty-queue))
+  (set! the-final-answer 'uninitialized)
+  (set! the-max-time-slice ticks)
+  (set! the-time-remaining the-max-time-slice))
+
+
 (define-datatype continuation continuation?
-  [end-cont]
+  [end-main-thread-cont]
+  [end-subthread-cont]
   [unop-arg-cont
     (unop1 unop?)
     (saved-cont continuation?)]
@@ -235,6 +257,8 @@
   [set-rhs-cont
     (loc reference?)
     (cont continuation?)]
+  [spawn-cont
+    (saved-cont continuation?)]
   )
 
 (define (empty-store) '())
@@ -278,10 +302,11 @@
 
 (define (apply-cont cont val)
   (cases continuation cont
-    [end-cont ()
-              (begin
-                (println "End-of-computation:")
-                val)]
+    [end-main-thread-cont ()
+                          (set-final-answer! val)
+                          (run-next-thread)]
+    [end-subthread-cont ()
+                        (run-next-thread)]
     [let-exp-cont (var body saved-env saved-cont)
                   (value-of/k body
                               (extend-env var (newref val) saved-env)
@@ -330,6 +355,14 @@
                   (begin
                     (setref! loc val)
                     (apply-cont cont (num-val 26)))]
+    [spawn-cont (saved-cont)
+      (let ([proc1 (expval->proc val)])
+        (place-on-ready-queue!
+          (lambda ()
+            (apply-procedure/k proc1
+                               (num-val 28)
+                               (end-subthread-cont))))
+        (apply-cont saved-cont (num-val 73)))]
     ))
 
 (define (apply-unop unop1 arg cont)
@@ -356,8 +389,12 @@
 
 (define (apply-handler val cont)
   (cases continuation cont
-    [end-cont ()
-                (error "Uncaught-exception" val)]
+    [end-main-thread-cont ()
+                (error "Uncaught-exception in main-thread" val)]
+    [end-subthread-cont ()
+                (error "Uncaught-exception in a subthread" val)]
+    [spawn-cont (saved-cont)
+                (apply-handler val saved-cont)]
     [unop-arg-cont (unop1 saved-cont)
                 (apply-handler val saved-cont)]
     [let-exp-cont (var body saved-env saved-cont)
@@ -457,13 +494,40 @@
 
 
 (define (run str ast)
-  (println (format "~a:~a" str (value-of-program ast))))
+  (println (format "~a:~a" str (value-of-program 1 ast))))
 
-(define (value-of-program pgm)
+(define (value-of-program timeslice pgm)
   (initialize-store!)
+  (initialize-scheduler! timeslice)
   (cases program pgm
     (a-program (exp1)
-      (value-of/k exp1 (init-env) (end-cont)))))
+      (value-of/k exp1
+                  (init-env)
+                  (end-main-thread-cont)))))
+
+(define (place-on-ready-queue! th)
+  (set! the-ready-queue
+    (enqueue the-ready-queue th)))
+
+(define (run-next-thread)
+  (if (empty? the-ready-queue)
+    the-final-answer
+    (dequeue the-ready-queue
+      (lambda (first-ready-thread other-ready-threads)
+        (set! the-ready-queue other-ready-threads)
+        (set! the-time-remaining the-max-time-slice)
+        (first-ready-thread)))))
+
+(define (set-final-answer! val)
+  (set! the-final-answer val))
+
+(define (time-expired?)
+  (zero? the-time-remaining))
+
+(define (decrement-timer!)
+  (set! the-time-remaining (sub1 the-time-remaining)))
+
+; value-of/k
 
 (define (value-of/k exp env cont)
   (cases expression exp
@@ -520,7 +584,9 @@
     [const-list-exp (nums)
                     (apply-cont cont
                                 (list-val (map num-val nums)))]
-
+    [spawn-exp (exp1)
+               (value-of/k exp1 env
+                           (spawn-cont cont))]
     [else (error "Unsupported" exp)]
     ))
 
