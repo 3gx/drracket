@@ -812,8 +812,13 @@ thread2
 
 (define thread3 (scan&parse "
   let x = 0
+  in let mut = mutex()
   in let incr_x = proc (id) proc (dummy)
-                    set x = -(x,-1)
+                    begin
+                      wait(mut);
+                      set x = -(x,-1);
+                      signal(mut)
+                    end
   in begin
       spawn( (incr_x 100));
       spawn( (incr_x 200));
