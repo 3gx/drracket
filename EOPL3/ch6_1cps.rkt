@@ -117,6 +117,33 @@
   (fact 5)
 )
 
+(module cps3 racket
+  (require eopl)
+  (require (submod ".." cps-base))
+  (define (fact n)
+    (fact/k n (lambda (val) val)))
+  (define (fact/k n cont)
+    (if (zero? n)
+      (cont 1)
+      (fact/k (- n 1) (lambda (val) (cont (* n val))))))
+  (fact 5)
+)
+
+
+(module fib0 racket
+  (define (fib n)
+    (fib/k n (lambda (val) val)))
+  (define (fib/k n cont)
+    (if (< n 2)
+      (cont 1)
+      (fib/k (- n 1)
+             (lambda (val1)
+               (fib/k (- n 2)
+                      (lambda (val2)
+                        (cont (+ val1 val2))))))))
+  (fib 10)
+)
+
 
 
 
@@ -124,5 +151,7 @@
 (require 'cps0)
 (require 'cps1)
 (require 'cps2)
+(require 'cps3)
+(require 'fib0)
 
 
